@@ -1,0 +1,7 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Manage Match | GMRCRIX</title><link rel="stylesheet" href="css/style.css"></head><body>
+<header><a class="logo" href="index.html">GMR<span>CRIX</span></a><nav><a href="admin.html">Admin</a></nav></header>
+<main class="container"><section class="card"><div class="live">MATCH MANAGEMENT</div><h1 id="title">Loading...</h1><p id="info" class="muted"></p></section>
+<div class="grid"><section class="card"><h2 id="teamATitle"></h2><div id="teamAStatus" class="notice"></div><div id="teamAPlayers"></div></section><section class="card"><h2 id="teamBTitle"></h2><div id="teamBStatus" class="notice"></div><div id="teamBPlayers"></div></section></div>
+<section class="card"><h2>Toss Board</h2><div class="grid"><select id="tossWinner"></select><select id="tossDecision"><option value="bat">Bat First</option><option value="bowl">Bowl First</option></select></div><button id="saveToss">Confirm Toss</button><p id="tossResult" class="notice"></p></section>
+<section class="card"><h2>Match Control</h2><p id="readyMessage" class="notice"></p><div class="row"><button id="startMatch">Start Match</button><button id="cancelMatch" class="danger">Cancel Match</button></div></section>
+</main><script type="module" src="js/manage.js"></script></body></html>

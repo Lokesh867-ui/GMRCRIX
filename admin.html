@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GMRCRIX Admin</title><link rel="stylesheet" href="css/style.css"></head><body>
+<header><a class="logo" href="index.html">GMR<span>CRIX</span> ADMIN</a><nav><a href="index.html">Public</a></nav></header>
+<main class="container">
+<section id="loginCard" class="card"><h2>Admin Login</h2><form id="loginForm"><input id="email" type="email" placeholder="Admin email" required><input id="password" type="password" placeholder="Password" required><button>Login</button><p id="loginError" class="bad"></p></form></section>
+<div id="dashboard" class="hidden">
+<div class="row between"><h1>Admin Control</h1><button id="logout" class="secondary" style="width:auto">Logout</button></div>
+<div class="grid">
+<section class="card"><h2>Teams</h2><form id="teamForm"><input id="teamName" placeholder="Team name" required><input id="teamCode" placeholder="Team code (CME)" required><button>Add Team</button></form><div id="teamList" class="list"></div></section>
+<section class="card"><h2>Players</h2><form id="playerForm"><input id="playerName" placeholder="Player name" required><select id="playerTeam"></select><select id="playerRole"><option>Batsman</option><option>Bowler</option><option>All-rounder</option><option>Wicketkeeper</option></select><button>Add Player</button></form><div id="playerList" class="list"></div></section>
+</div>
+<section class="card"><h2>Create Match</h2><form id="matchForm" class="grid"><div><input id="matchName" placeholder="Match name" required><select id="teamA"></select><select id="teamB"></select></div><div><input id="matchOvers" type="number" min="1" value="20" required><input id="venue" placeholder="Venue"><button>Create Match</button></div></form></section>
+<section class="card"><h2>Matches</h2><div id="matchList" class="list"></div></section>
+</div></main><script type="module" src="js/admin.js"></script></body></html>
