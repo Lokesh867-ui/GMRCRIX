@@ -287,6 +287,11 @@ function findPlayer(players, id) {
    UPDATE CURRENT PLAYERS
 ================================ */
 
+/* ================================
+   UPDATE CURRENT PLAYERS
+   PUBLIC VIEW
+================================ */
+
 function updateCurrentPlayers(
   innings,
   deliveries,
@@ -322,9 +327,15 @@ function updateCurrentPlayers(
   }
 
 
-  /* No deliveries yet */
+  /*
+    No innings state available.
+  */
 
-  if (!deliveries.length) {
+  if (
+    !innings.striker_id &&
+    !innings.non_striker_id &&
+    !innings.bowler_id
+  ) {
 
     strikerElement.textContent =
       'Not started';
@@ -345,9 +356,162 @@ function updateCurrentPlayers(
       '';
 
     return;
+  }
+
+
+  /*
+    IMPORTANT:
+
+    Read CURRENT state from innings table.
+
+    Do NOT use latest delivery's striker_id
+    because that is the player who faced
+    that particular delivery.
+  */
+
+  const currentStriker =
+    findPlayer(
+      players,
+      innings.striker_id
+    );
+
+  const currentNonStriker =
+    findPlayer(
+      players,
+      innings.non_striker_id
+    );
+
+  const currentBowler =
+    findPlayer(
+      players,
+      innings.bowler_id
+    );
+
+
+  /* ================================
+     STRIKER
+  ================================ */
+
+  strikerElement.textContent =
+    currentStriker?.name ||
+    'Not available';
+
+
+  const strikerData =
+    stats.batting.find(
+      player =>
+        player.id === innings.striker_id
+    );
+
+
+  if (strikerData) {
+
+    const sr =
+      strikerData.balls
+        ? (
+            strikerData.runs /
+            strikerData.balls *
+            100
+          ).toFixed(2)
+        : '0.00';
+
+
+    strikerStatsElement.textContent =
+      `${strikerData.runs} runs · ` +
+      `${strikerData.balls} balls · ` +
+      `SR ${sr}`;
+
+  } else {
+
+    strikerStatsElement.textContent =
+      '0 runs · 0 balls · SR 0.00';
 
   }
 
+
+  /* ================================
+     NON-STRIKER
+  ================================ */
+
+  nonStrikerElement.textContent =
+    currentNonStriker?.name ||
+    'Not available';
+
+
+  const nonStrikerData =
+    stats.batting.find(
+      player =>
+        player.id ===
+        innings.non_striker_id
+    );
+
+
+  if (nonStrikerData) {
+
+    const sr =
+      nonStrikerData.balls
+        ? (
+            nonStrikerData.runs /
+            nonStrikerData.balls *
+            100
+          ).toFixed(2)
+        : '0.00';
+
+
+    nonStrikerStatsElement.textContent =
+      `${nonStrikerData.runs} runs · ` +
+      `${nonStrikerData.balls} balls · ` +
+      `SR ${sr}`;
+
+  } else {
+
+    nonStrikerStatsElement.textContent =
+      '0 runs · 0 balls · SR 0.00';
+
+  }
+
+
+  /* ================================
+     BOWLER
+  ================================ */
+
+  bowlerElement.textContent =
+    currentBowler?.name ||
+    'Not available';
+
+
+  const bowlerData =
+    stats.bowling.find(
+      player =>
+        player.id === innings.bowler_id
+    );
+
+
+  if (bowlerData) {
+
+    const economy =
+      bowlerData.balls
+        ? (
+            bowlerData.runs /
+            (bowlerData.balls / 6)
+          ).toFixed(2)
+        : '0.00';
+
+
+    bowlerStatsElement.textContent =
+      `${formatOvers(bowlerData.balls)} overs · ` +
+      `${bowlerData.runs} runs · ` +
+      `${bowlerData.wickets} wickets · ` +
+      `Econ ${economy}`;
+
+  } else {
+
+    bowlerStatsElement.textContent =
+      '0.0 overs · 0 runs · 0 wickets';
+
+  }
+
+}
 
   /* Latest delivery */
 
