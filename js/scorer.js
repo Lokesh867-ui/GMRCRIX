@@ -751,102 +751,64 @@ async function record(x) {
     return;
   }
 
-  /*
-    NEW BATSMAN AFTER WICKET
-  */
+/*
+  SAVE CURRENT MATCH STATE
+  TO SUPABASE
+*/
 
-  if (x.wicket) {
+const { error: stateError } =
+  await supabase
+    .from('innings')
+    .update({
 
-    if (x.dismissed === state.striker) {
-      state.striker = x.newBatsman || null;
-    }
+      striker_id:
+        state.striker || null,
 
-    if (x.dismissed === state.non) {
-      state.non = x.newBatsman || null;
-    }
+      non_striker_id:
+        state.non || null,
 
-  } else {
+      bowler_id:
+        state.bowler || null
 
-    /*
-      Change strike on odd running runs.
-    */
-
-    const runningRuns =
-      Number(x.bat || 0) +
-      Number(x.bye || 0) +
-      Number(x.legBye || 0);
-
-    if (runningRuns % 2 !== 0) {
-      [state.striker, state.non] =
-        [state.non, state.striker];
-    }
-  }
-
-  const updated = await deliveries();
-  const updatedCalc = calc(updated);
-
-  /*
-    CHECK TARGET BEFORE MAXIMUM OVERS.
-  */
-
-  if (innings.innings_no === 2 && innings.target) {
-
-    if (updatedCalc.runs >= Number(innings.target)) {
-
-      await refresh();
-
-      await finishSecond(true);
-
-      return;
-    }
-  }
-
-  /*
-    MAXIMUM OVERS COMPLETED
-  */
-
-  if (updatedCalc.legal >= maximumBalls) {
-
-    await refresh();
-
-    await oversCompleted(updatedCalc);
-
-    return;
-  }
-
-  /*
-    NORMAL OVER COMPLETED
-  */
-
-  if (
-    legalBall &&
-    updatedCalc.legal > 0 &&
-    updatedCalc.legal % 6 === 0
-  ) {
-
-    /*
-      Change batsmen at end of over.
-    */
-
-    [state.striker, state.non] =
-      [state.non, state.striker];
-
-    /*
-      Force admin to select new bowler.
-    */
-
-    state.bowler = null;
-
-    alert(
-      '✓ Over completed.\n\nSelect a new bowler.'
+    })
+    .eq(
+      'id',
+      innings.id
     );
-  }
 
-  fillSelects();
 
-  await refresh();
+if (stateError) {
+
+  console.error(
+    'Unable to save current player state:',
+    stateError
+  );
+
+  alert(
+    'Score saved, but current player state could not be saved.'
+  );
+
+  return;
 }
 
+
+/*
+  Keep local object synchronized.
+*/
+
+innings.striker_id =
+  state.striker || null;
+
+innings.non_striker_id =
+  state.non || null;
+
+innings.bowler_id =
+  state.bowler || null;
+
+
+fillSelects();
+
+await refresh();
 /* =========================
    OVERS COMPLETED
 ========================= */
