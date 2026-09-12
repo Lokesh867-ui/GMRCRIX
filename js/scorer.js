@@ -1,10 +1,13 @@
 import { supabase } from './supabase.js';
 
 const $ = id => document.getElementById(id);
-const matchId = new URLSearchParams(location.search).get('id');
+
+const matchId =
+  new URLSearchParams(location.search).get('id');
 
 let match = null;
 let innings = null;
+
 let batting = [];
 let bowling = [];
 
@@ -23,11 +26,13 @@ const esc = s =>
     "'": '&#39;'
   }[c]));
 
+
 /* =========================
    AUTHENTICATION
 ========================= */
 
 async function ensureAuth() {
+
   const {
     data: { session }
   } = await supabase.auth.getSession();
@@ -40,52 +45,74 @@ async function ensureAuth() {
   return true;
 }
 
+
 /* =========================
    GET DELIVERIES
 ========================= */
 
 async function deliveries() {
+
   if (!innings) return [];
 
-  const { data, error } = await supabase
-    .from('deliveries')
-    .select('*')
-    .eq('innings_id', innings.id)
-    .order('created_at', { ascending: true });
+  const { data, error } =
+    await supabase
+      .from('deliveries')
+      .select('*')
+      .eq('innings_id', innings.id)
+      .order('created_at', {
+        ascending: true
+      });
 
   if (error) {
-    console.error(error);
+
+    console.error(
+      'Unable to load deliveries:',
+      error
+    );
+
     return [];
   }
 
   return data || [];
 }
 
+
 /* =========================
    CALCULATE SCORE
 ========================= */
 
 function calc(d) {
-  const runs = d.reduce(
-    (sum, ball) => sum + Number(ball.total_runs || 0),
-    0
-  );
 
-  const wickets = d.filter(
-    ball => ball.wicket
-  ).length;
+  const runs =
+    d.reduce(
+      (sum, ball) =>
+        sum + Number(ball.total_runs || 0),
+      0
+    );
 
-  const legal = d.filter(
-    ball => ball.legal_ball
-  ).length;
+  const wickets =
+    d.filter(
+      ball => ball.wicket
+    ).length;
+
+  const legal =
+    d.filter(
+      ball => ball.legal_ball
+    ).length;
 
   return {
+
     runs,
+
     wickets,
+
     legal,
-    overs: `${Math.floor(legal / 6)}.${legal % 6}`
+
+    overs:
+      `${Math.floor(legal / 6)}.${legal % 6}`
   };
 }
+
 
 /* =========================
    LOAD MATCH
@@ -93,104 +120,165 @@ function calc(d) {
 
 async function load() {
 
-  const { data: m, error } = await supabase
-    .from('matches')
-    .select(`
-      *,
-      team_a:teams!matches_team_a_id_fkey(id,name),
-      team_b:teams!matches_team_b_id_fkey(id,name)
-    `)
-    .eq('id', matchId)
-    .single();
+  const { data: m, error } =
+    await supabase
+      .from('matches')
+      .select(`
+        *,
+        team_a:teams!matches_team_a_id_fkey(id,name),
+        team_b:teams!matches_team_b_id_fkey(id,name)
+      `)
+      .eq('id', matchId)
+      .single();
 
   if (error) {
-    alert(error.message);
+
+    alert(
+      'Unable to load match: ' +
+      error.message
+    );
+
     return;
   }
 
   match = m;
 
+
   /*
-    Find currently live innings.
+    Find live innings.
   */
 
-  const { data: i, error: inningsError } = await supabase
-    .from('innings')
-    .select('*')
-    .eq('match_id', matchId)
-    .eq('status', 'live')
-    .order('innings_no', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const {
+    data: i,
+    error: inningsError
+  } =
+    await supabase
+      .from('innings')
+      .select('*')
+      .eq('match_id', matchId)
+      .eq('status', 'live')
+      .order('innings_no', {
+        ascending: false
+      })
+      .limit(1)
+      .maybeSingle();
 
   if (inningsError) {
-    alert(inningsError.message);
+
+    alert(
+      'Unable to load innings: ' +
+      inningsError.message
+    );
+
     return;
   }
+
 
   innings = i;
 
+
   if (!innings) {
-    alert('There is no active innings.');
-    location.href = `manage.html?id=${matchId}`;
+
+    alert(
+      'There is no active innings.'
+    );
+
+    location.href =
+      `manage.html?id=${matchId}`;
+
     return;
   }
 
-  /*
-    LOAD PLAYERS
 
-    This uses match_players if your Playing XI
-    is stored there.
+  /*
+    Load Playing XI.
   */
 
-  const { data: mp, error: mpError } = await supabase
-    .from('match_players')
-    .select(`
-      team_id,
-      players(id,name,role)
-    `)
-    .eq('match_id', matchId)
-    .eq('is_playing_xi', true);
+  const {
+    data: mp,
+    error: mpError
+  } =
+    await supabase
+      .from('match_players')
+      .select(`
+        team_id,
+        players(id,name,role)
+      `)
+      .eq('match_id', matchId)
+      .eq('is_playing_xi', true);
 
   if (mpError) {
-    console.error(mpError);
-    alert('Unable to load Playing XI: ' + mpError.message);
+
+    alert(
+      'Unable to load Playing XI: ' +
+      mpError.message
+    );
+
     return;
   }
 
-  batting = (mp || [])
-    .filter(x => x.team_id === innings.batting_team_id)
-    .map(x => x.players)
-    .filter(Boolean);
 
-  bowling = (mp || [])
-    .filter(x => x.team_id === innings.bowling_team_id)
-    .map(x => x.players)
-    .filter(Boolean);
+  batting =
+    (mp || [])
+      .filter(
+        x =>
+          x.team_id ===
+          innings.batting_team_id
+      )
+      .map(
+        x => x.players
+      )
+      .filter(Boolean);
+
+
+  bowling =
+    (mp || [])
+      .filter(
+        x =>
+          x.team_id ===
+          innings.bowling_team_id
+      )
+      .map(
+        x => x.players
+      )
+      .filter(Boolean);
+
 
   /*
-    PAGE DETAILS
+    Page information.
   */
 
   if ($('title')) {
+
     $('title').textContent =
       `${match.team_a.name} vs ${match.team_b.name}`;
   }
 
+
   if ($('inningsTitle')) {
+
     $('inningsTitle').textContent =
       `Innings ${innings.innings_no} · LIVE`;
   }
 
+
   if ($('target')) {
+
     $('target').textContent =
       innings.target || '—';
   }
 
+
   if ($('publicLink')) {
+
     $('publicLink').href =
       `match.html?id=${matchId}`;
   }
+
+
+  /*
+    Restore saved current players.
+  */
 
   await rebuildState();
 
@@ -199,9 +287,6 @@ async function load() {
   await refresh();
 }
 
-/* =========================
-   REBUILD CURRENT STATE
-========================= */
 
 /* =========================
    REBUILD CURRENT STATE
@@ -211,7 +296,8 @@ async function rebuildState() {
 
   /*
     FIRST PRIORITY:
-    Read the current state saved
+
+    Use the persistent state stored
     in the innings table.
   */
 
@@ -231,7 +317,6 @@ async function rebuildState() {
 
       bowler:
         innings.bowler_id || null
-
     };
 
     return;
@@ -239,21 +324,25 @@ async function rebuildState() {
 
 
   /*
-    BACKWARD COMPATIBILITY
+    BACKWARD COMPATIBILITY:
 
-    If old innings does not have
-    saved player state, reconstruct
-    it from deliveries.
+    If old innings does not contain
+    saved player state, rebuild from
+    deliveries.
   */
 
-  const d = await deliveries();
+  const d =
+    await deliveries();
 
 
   if (!d.length) {
 
     state = {
+
       striker: null,
+
       non: null,
+
       bowler: null
     };
 
@@ -268,19 +357,25 @@ async function rebuildState() {
   state = {
 
     striker:
-      last.striker_id,
+      last.striker_id || null,
 
     non:
-      last.non_striker_id,
+      last.non_striker_id || null,
 
     bowler:
-      last.bowler_id
-
+      last.bowler_id || null
   };
 
 
   /*
-    Running runs change ends.
+    Running runs can change strike.
+
+    Batsman runs,
+    byes and leg-byes
+    are running runs.
+
+    Wide and no-ball extras
+    are not included here.
   */
 
   const runningRuns =
@@ -294,17 +389,45 @@ async function rebuildState() {
     [
       state.striker,
       state.non
-    ] =
-    [
+    ] = [
       state.non,
       state.striker
     ];
-
   }
 
 
   /*
-    Over completed.
+    Wicket.
+
+    Remove dismissed player from
+    current state.
+  */
+
+  if (last.wicket) {
+
+    if (
+      last.dismissed_player_id ===
+      state.striker
+    ) {
+
+      state.striker = null;
+    }
+
+    if (
+      last.dismissed_player_id ===
+      state.non
+    ) {
+
+      state.non = null;
+    }
+  }
+
+
+  /*
+    End of over.
+
+    Strike changes and bowler
+    must be selected again.
   */
 
   const legalBalls =
@@ -322,69 +445,15 @@ async function rebuildState() {
     [
       state.striker,
       state.non
-    ] =
-    [
+    ] = [
       state.non,
       state.striker
     ];
 
     state.bowler = null;
-
-  }
-
-}
-  /*
-    Strike changes for odd runs.
-
-    Only batsman runs, byes and leg byes
-    cause batsmen to change ends.
-  */
-
-  const runningRuns =
-    Number(last.batsman_runs || 0) +
-    Number(last.extras_byes || 0) +
-    Number(last.extras_legbyes || 0);
-
-  if (runningRuns % 2 !== 0) {
-    [state.striker, state.non] =
-      [state.non, state.striker];
-  }
-
-  /*
-    Wicket.
-  */
-
-  if (last.wicket) {
-
-    if (last.dismissed_player_id === last.striker_id) {
-      state.striker = null;
-    }
-
-    if (last.dismissed_player_id === last.non_striker_id) {
-      state.non = null;
-    }
-  }
-
-  /*
-    Over completed.
-  */
-
-  const legalBalls = d.filter(
-    x => x.legal_ball
-  ).length;
-
-  if (
-    legalBalls > 0 &&
-    legalBalls % 6 === 0 &&
-    last.legal_ball
-  ) {
-
-    [state.striker, state.non] =
-      [state.non, state.striker];
-
-    state.bowler = null;
   }
 }
+
 
 /* =========================
    PLAYER OPTIONS
@@ -396,30 +465,122 @@ function opts(players) {
     <option value="">
       Select player
     </option>
-  ` + players.map(player => `
-    <option value="${player.id}">
-      ${esc(player.name)} (${esc(player.role || '')})
-    </option>
-  `).join('');
+
+    ${
+      players
+        .map(player => `
+          <option value="${player.id}">
+            ${esc(player.name)}
+            ${player.role
+              ? ` (${esc(player.role)})`
+              : ''}
+          </option>
+        `)
+        .join('')
+    }
+  `;
 }
+
+
+/* =========================
+   FILL PLAYER SELECTS
+========================= */
 
 function fillSelects() {
 
   if ($('striker')) {
-    $('striker').innerHTML = opts(batting);
-    $('striker').value = state.striker || '';
+
+    $('striker').innerHTML =
+      opts(batting);
+
+    $('striker').value =
+      state.striker || '';
   }
+
 
   if ($('nonStriker')) {
-    $('nonStriker').innerHTML = opts(batting);
-    $('nonStriker').value = state.non || '';
+
+    $('nonStriker').innerHTML =
+      opts(batting);
+
+    $('nonStriker').value =
+      state.non || '';
   }
 
+
   if ($('bowler')) {
-    $('bowler').innerHTML = opts(bowling);
-    $('bowler').value = state.bowler || '';
+
+    $('bowler').innerHTML =
+      opts(bowling);
+
+    $('bowler').value =
+      state.bowler || '';
   }
 }
+
+
+/* =========================
+   SAVE CURRENT PLAYER STATE
+========================= */
+
+async function saveCurrentState() {
+
+  const {
+    error
+  } =
+    await supabase
+      .from('innings')
+      .update({
+
+        striker_id:
+          state.striker || null,
+
+        non_striker_id:
+          state.non || null,
+
+        bowler_id:
+          state.bowler || null
+
+      })
+      .eq(
+        'id',
+        innings.id
+      );
+
+
+  if (error) {
+
+    console.error(
+      'Unable to save current player state:',
+      error
+    );
+
+    alert(
+      'Score saved, but current player state could not be saved.'
+    );
+
+    return false;
+  }
+
+
+  /*
+    Keep local innings object
+    synchronized.
+  */
+
+  innings.striker_id =
+    state.striker || null;
+
+  innings.non_striker_id =
+    state.non || null;
+
+  innings.bowler_id =
+    state.bowler || null;
+
+
+  return true;
+}
+
 
 /* =========================
    REFRESH SCOREBOARD
@@ -427,62 +588,99 @@ function fillSelects() {
 
 async function refresh() {
 
-  const d = await deliveries();
-  const c = calc(d);
+  const d =
+    await deliveries();
 
-  const rr = c.legal
-    ? (c.runs / (c.legal / 6)).toFixed(2)
-    : '0.00';
+  const c =
+    calc(d);
+
+
+  const rr =
+    c.legal
+      ? (
+          c.runs /
+          (c.legal / 6)
+        ).toFixed(2)
+      : '0.00';
+
 
   if ($('score')) {
+
     $('score').textContent =
       `${c.runs}/${c.wickets}`;
   }
 
+
   if ($('rr')) {
-    $('rr').textContent = rr;
+
+    $('rr').textContent =
+      rr;
   }
+
 
   if ($('overText')) {
 
-    const maxBalls = Number(match.overs) * 6;
+    const maxBalls =
+      Number(match.overs) * 6;
 
-    let text = `Overs: ${c.overs}`;
+    let text =
+      `Overs: ${c.overs}`;
+
 
     if (c.legal >= maxBalls) {
-      text = `✓ ${match.overs} Overs Completed`;
+
+      text =
+        `✓ ${match.overs} Overs Completed`;
     }
 
-    $('overText').textContent = text;
+
+    $('overText').textContent =
+      text;
   }
 
+
   /*
-    Commentary
+    Commentary.
   */
 
   if ($('commentary')) {
 
     $('commentary').innerHTML =
-      d.slice()
+      d
+        .slice()
         .reverse()
         .map(x => `
           <div class="comment">
-            <b>${x.over_number}.${x.ball_number}</b>
-            — ${esc(x.commentary || 'Ball recorded')}
+
+            <b>
+              ${x.over_number}.${x.ball_number}
+            </b>
+
+            — ${esc(
+              x.commentary ||
+              'Ball recorded'
+            )}
+
           </div>
         `)
         .join('') ||
+
       '<p class="muted">No deliveries yet.</p>';
   }
 
+
   if ($('battingStats')) {
+
     battingStats(d);
   }
 
+
   if ($('bowlingStats')) {
+
     bowlingStats(d);
   }
 }
+
 
 /* =========================
    BATTING STATISTICS
@@ -491,43 +689,95 @@ async function refresh() {
 function battingStats(d) {
 
   $('battingStats').innerHTML =
-    batting.map(player => {
 
-      const playerBalls = d.filter(
-        x =>
-          x.striker_id === player.id &&
-          x.legal_ball
-      ).length;
+    batting
+      .map(player => {
 
-      const playerRuns = d
-        .filter(x => x.striker_id === player.id)
-        .reduce(
-          (sum, x) =>
-            sum + Number(x.batsman_runs || 0),
-          0
-        );
+        const playerBalls =
+          d.filter(
+            x =>
+              x.striker_id === player.id &&
+              x.legal_ball
+          ).length;
 
-      const sr = playerBalls
-        ? ((playerRuns * 100) / playerBalls).toFixed(1)
-        : '0.0';
 
-      return `
-        <div class="item">
-          <strong>
-            ${esc(player.name)}
-            ${state.striker === player.id ? '*' : ''}
-          </strong>
+        const playerRuns =
+          d
+            .filter(
+              x =>
+                x.striker_id === player.id
+            )
+            .reduce(
+              (sum, x) =>
+                sum +
+                Number(
+                  x.batsman_runs || 0
+                ),
+              0
+            );
 
-          <span class="small">
-            ${playerRuns} runs
-            · ${playerBalls} balls
-            · SR ${sr}
-          </span>
-        </div>
-      `;
 
-    }).join('');
+        const fours =
+          d.filter(
+            x =>
+              x.striker_id === player.id &&
+              Number(x.batsman_runs || 0) === 4
+          ).length;
+
+
+        const sixes =
+          d.filter(
+            x =>
+              x.striker_id === player.id &&
+              Number(x.batsman_runs || 0) === 6
+          ).length;
+
+
+        const sr =
+          playerBalls
+            ? (
+                (playerRuns * 100) /
+                playerBalls
+              ).toFixed(1)
+            : '0.0';
+
+
+        return `
+          <div class="item">
+
+            <strong>
+
+              ${esc(player.name)}
+
+              ${
+                state.striker === player.id
+                  ? '*'
+                  : ''
+              }
+
+            </strong>
+
+            <span class="small">
+
+              ${playerRuns} runs
+
+              · ${playerBalls} balls
+
+              · ${fours} fours
+
+              · ${sixes} sixes
+
+              · SR ${sr}
+
+            </span>
+
+          </div>
+        `;
+
+      })
+      .join('');
 }
+
 
 /* =========================
    BOWLING STATISTICS
@@ -536,90 +786,175 @@ function battingStats(d) {
 function bowlingStats(d) {
 
   $('bowlingStats').innerHTML =
-    bowling.map(player => {
 
-      const mine = d.filter(
-        x => x.bowler_id === player.id
-      );
+    bowling
+      .map(player => {
 
-      const legal = mine.filter(
-        x => x.legal_ball
-      ).length;
+        const mine =
+          d.filter(
+            x =>
+              x.bowler_id === player.id
+          );
 
-      const runs = mine.reduce(
-        (sum, x) =>
-          sum + Number(x.total_runs || 0),
-        0
-      );
 
-      const economy = legal
-        ? (runs / (legal / 6)).toFixed(2)
-        : '0.00';
+        const legal =
+          mine.filter(
+            x =>
+              x.legal_ball
+          ).length;
 
-      const wickets = mine.filter(
-        x =>
-          x.wicket &&
-          [
-            'Bowled',
-            'Caught',
-            'LBW',
-            'Stumped',
-            'Hit Wicket'
-          ].includes(x.dismissal_type)
-      ).length;
 
-      return `
-        <div class="item">
+        const runs =
+          mine.reduce(
+            (sum, x) =>
+              sum +
+              Number(
+                x.total_runs || 0
+              ),
+            0
+          );
 
-          <strong>
-            ${esc(player.name)}
-            ${state.bowler === player.id ? '*' : ''}
-          </strong>
 
-          <span class="small">
-            ${Math.floor(legal / 6)}.${legal % 6} overs
-            · ${runs} runs
-            · ${wickets} wickets
-            · ECO ${economy}
-          </span>
+        const economy =
+          legal
+            ? (
+                runs /
+                (legal / 6)
+              ).toFixed(2)
+            : '0.00';
 
-        </div>
-      `;
 
-    }).join('');
+        const wickets =
+          mine.filter(
+            x =>
+              x.wicket &&
+              [
+                'Bowled',
+                'Caught',
+                'LBW',
+                'Stumped',
+                'Hit Wicket'
+              ].includes(
+                x.dismissal_type
+              )
+          ).length;
+
+
+        return `
+          <div class="item">
+
+            <strong>
+
+              ${esc(player.name)}
+
+              ${
+                state.bowler === player.id
+                  ? '*'
+                  : ''
+              }
+
+            </strong>
+
+            <span class="small">
+
+              ${Math.floor(legal / 6)}.${legal % 6}
+              overs
+
+              · ${runs} runs
+
+              · ${wickets} wickets
+
+              · ECO ${economy}
+
+            </span>
+
+          </div>
+        `;
+
+      })
+      .join('');
 }
 
+
 /* =========================
-   SAVE PLAYERS
+   SAVE PLAYERS BUTTON
 ========================= */
 
 if ($('savePlayers')) {
 
-  $('savePlayers').onclick = () => {
+  $('savePlayers').onclick =
+    async () => {
 
-    const striker = $('striker').value;
-    const non = $('nonStriker').value;
-    const bowler = $('bowler').value;
+      const striker =
+        $('striker')
+          ? $('striker').value
+          : '';
 
-    if (!striker || !non || !bowler) {
-      alert('Select striker, non-striker and bowler.');
-      return;
-    }
+      const non =
+        $('nonStriker')
+          ? $('nonStriker').value
+          : '';
 
-    if (striker === non) {
-      alert('Striker and non-striker cannot be the same.');
-      return;
-    }
+      const bowler =
+        $('bowler')
+          ? $('bowler').value
+          : '';
 
-    state = {
-      striker,
-      non,
-      bowler
+
+      if (
+        !striker ||
+        !non ||
+        !bowler
+      ) {
+
+        alert(
+          'Select striker, non-striker and bowler.'
+        );
+
+        return;
+      }
+
+
+      if (striker === non) {
+
+        alert(
+          'Striker and non-striker cannot be the same.'
+        );
+
+        return;
+      }
+
+
+      state = {
+
+        striker,
+
+        non,
+
+        bowler
+      };
+
+
+      const saved =
+        await saveCurrentState();
+
+
+      if (!saved) {
+        return;
+      }
+
+
+      fillSelects();
+
+      await refresh();
+
+
+      alert(
+        'Players saved successfully.'
+      );
     };
-
-    alert('Players selected successfully.');
-  };
 }
+
 
 /* =========================
    RECORD BALL
@@ -628,25 +963,38 @@ if ($('savePlayers')) {
 async function record(x) {
 
   /*
-    Prevent scoring when paused.
+    Match paused.
   */
 
   if (match.status === 'paused') {
-    alert('Match is currently paused.');
+
+    alert(
+      'Match is currently paused.'
+    );
+
     return;
   }
 
+
   /*
-    Check active innings.
+    Active innings check.
   */
 
-  if (!innings || innings.status !== 'live') {
-    alert('There is no active innings.');
+  if (
+    !innings ||
+    innings.status !== 'live'
+  ) {
+
+    alert(
+      'There is no active innings.'
+    );
+
     return;
   }
 
+
   /*
-    Check striker, non-striker and bowler.
+    Player check.
   */
 
   if (
@@ -654,23 +1002,38 @@ async function record(x) {
     !state.non ||
     !state.bowler
   ) {
+
     alert(
       'Select striker, non-striker and bowler first.'
     );
+
     return;
   }
 
-  const existing = await deliveries();
-  const current = calc(existing);
+
+  /*
+    Existing deliveries.
+  */
+
+  const existing =
+    await deliveries();
+
+  const current =
+    calc(existing);
+
 
   const maximumBalls =
     Number(match.overs) * 6;
 
+
   /*
-    Prevent scoring after overs completed.
+    Maximum overs already reached.
   */
 
-  if (current.legal >= maximumBalls) {
+  if (
+    current.legal >=
+    maximumBalls
+  ) {
 
     alert(
       `${match.overs} overs are already completed.`
@@ -679,12 +1042,20 @@ async function record(x) {
     return;
   }
 
+
   /*
-    Wide and no-ball are not legal balls.
+    Wide and no-ball
+    are not legal balls.
   */
 
   const legalBall =
-    !x.wide && !x.noBall;
+    !x.wide &&
+    !x.noBall;
+
+
+  /*
+    Total runs.
+  */
 
   const totalRuns =
     Number(x.bat || 0) +
@@ -693,144 +1064,460 @@ async function record(x) {
     Number(x.bye || 0) +
     Number(x.legBye || 0);
 
+
   /*
-    Current over and ball number.
+    Current over.
   */
 
   const overNumber =
-    Math.floor(current.legal / 6);
+    Math.floor(
+      current.legal / 6
+    );
+
+
+  /*
+    Current ball number.
+
+    Illegal deliveries do not
+    increase legal ball count.
+  */
 
   const ballNumber =
     (current.legal % 6) + 1;
 
+
+  /*
+    Save the player IDs that
+    actually faced this delivery.
+  */
+
+  const deliveryStriker =
+    state.striker;
+
+  const deliveryNon =
+    state.non;
+
+  const deliveryBowler =
+    state.bowler;
+
+
   const row = {
 
-    innings_id: innings.id,
+    innings_id:
+      innings.id,
 
-    over_number: overNumber,
+    over_number:
+      overNumber,
 
-    ball_number: ballNumber,
+    ball_number:
+      ballNumber,
 
-    striker_id: state.striker,
+    striker_id:
+      deliveryStriker,
 
-    non_striker_id: state.non,
+    non_striker_id:
+      deliveryNon,
 
-    bowler_id: state.bowler,
+    bowler_id:
+      deliveryBowler,
 
-    batsman_runs: Number(x.bat || 0),
+    batsman_runs:
+      Number(x.bat || 0),
 
-    extras_wides: Number(x.wide || 0),
+    extras_wides:
+      Number(x.wide || 0),
 
-    extras_noballs: Number(x.noBall || 0),
+    extras_noballs:
+      Number(x.noBall || 0),
 
-    extras_byes: Number(x.bye || 0),
+    extras_byes:
+      Number(x.bye || 0),
 
-    extras_legbyes: Number(x.legBye || 0),
+    extras_legbyes:
+      Number(x.legBye || 0),
 
-    total_runs: totalRuns,
+    total_runs:
+      totalRuns,
 
-    legal_ball: legalBall,
+    legal_ball:
+      legalBall,
 
-    wicket: !!x.wicket,
+    wicket:
+      !!x.wicket,
 
-    dismissal_type: x.dismissal || null,
+    dismissal_type:
+      x.dismissal || null,
 
-    dismissed_player_id: x.dismissed || null,
+    dismissed_player_id:
+      x.dismissed || null,
 
-    fielder_id: x.fielder || null,
+    fielder_id:
+      x.fielder || null,
 
-    commentary: x.commentary || ''
+    commentary:
+      x.commentary || ''
   };
 
-  const { error } = await supabase
-    .from('deliveries')
-    .insert(row);
+
+  /*
+    Insert delivery.
+  */
+
+  const {
+    error
+  } =
+    await supabase
+      .from('deliveries')
+      .insert(row);
+
 
   if (error) {
-    alert(error.message);
+
+    alert(
+      'Unable to save ball: ' +
+      error.message
+    );
+
     return;
   }
 
-/*
-  SAVE CURRENT MATCH STATE
-  TO SUPABASE
-*/
 
-const { error: stateError } =
-  await supabase
-    .from('innings')
-    .update({
+  /*
+    =========================
+    UPDATE PLAYER STATE
+    =========================
+  */
 
-      striker_id:
-        state.striker || null,
 
-      non_striker_id:
-        state.non || null,
+  /*
+    Running runs.
 
-      bowler_id:
-        state.bowler || null
+    Batsman runs,
+    byes and leg-byes
+    change strike when odd.
+  */
 
-    })
-    .eq(
-      'id',
-      innings.id
+  const runningRuns =
+    Number(x.bat || 0) +
+    Number(x.bye || 0) +
+    Number(x.legBye || 0);
+
+
+  if (
+    runningRuns % 2 !== 0
+  ) {
+
+    [
+      state.striker,
+      state.non
+    ] = [
+      state.non,
+      state.striker
+    ];
+  }
+
+
+  /*
+    Wicket.
+
+    Remove dismissed player
+    from current state.
+
+    This also works if strike
+    changed because of an odd run.
+  */
+
+  if (x.wicket) {
+
+    if (
+      state.striker ===
+      x.dismissed
+    ) {
+
+      state.striker = null;
+    }
+
+
+    if (
+      state.non ===
+      x.dismissed
+    ) {
+
+      state.non = null;
+    }
+  }
+
+
+  /*
+    Legal ball count after
+    inserting the new delivery.
+  */
+
+  const newLegal =
+    current.legal +
+    (legalBall ? 1 : 0);
+
+
+  /*
+    End of over.
+
+    Only a legal sixth ball
+    completes the over.
+  */
+
+  const overCompleted =
+    legalBall &&
+    newLegal > 0 &&
+    newLegal % 6 === 0;
+
+
+  if (overCompleted) {
+
+    [
+      state.striker,
+      state.non
+    ] = [
+      state.non,
+      state.striker
+    ];
+
+
+    /*
+      New bowler must be selected.
+    */
+
+    state.bowler = null;
+  }
+
+
+  /*
+    Save the NEW state.
+
+    This is the important part:
+    save AFTER strike/wicket/over
+    calculations.
+  */
+
+  const stateSaved =
+    await saveCurrentState();
+
+
+  if (!stateSaved) {
+    return;
+  }
+
+
+  fillSelects();
+
+  await refresh();
+
+
+  /*
+    Get updated score.
+  */
+
+  const updatedDeliveries =
+    await deliveries();
+
+  const score =
+    calc(updatedDeliveries);
+
+
+  /*
+    =========================
+    SECOND INNINGS
+    =========================
+  */
+
+  if (
+    innings.innings_no === 2
+  ) {
+
+    const firstRuns =
+      await firstScore();
+
+
+    /*
+      Target reached.
+    */
+
+    if (
+      score.runs >
+      firstRuns
+    ) {
+
+      await finishSecond(true);
+
+      return;
+    }
+
+
+    /*
+      All wickets lost.
+    */
+
+    if (
+      score.wickets >= 10
+    ) {
+
+      await finishSecond(false);
+
+      return;
+    }
+
+
+    /*
+      Overs completed.
+    */
+
+    if (
+      score.legal >=
+      maximumBalls
+    ) {
+
+      await finishSecond(false);
+
+      return;
+    }
+
+
+    /*
+      Need new batsman after wicket.
+    */
+
+    if (
+      x.wicket &&
+      (
+        !state.striker ||
+        !state.non
+      )
+    ) {
+
+      alert(
+        'Wicket! Select the new batsman.'
+      );
+
+      return;
+    }
+
+
+    /*
+      New bowler after over.
+    */
+
+    if (overCompleted) {
+
+      alert(
+        `Over ${Math.floor(newLegal / 6)} completed. Select a new bowler.`
+      );
+
+      return;
+    }
+
+
+    return;
+  }
+
+
+  /*
+    =========================
+    FIRST INNINGS
+    =========================
+  */
+
+
+  /*
+    All wickets lost.
+  */
+
+  if (
+    score.wickets >= 10
+  ) {
+
+    await oversCompleted(score);
+
+    return;
+  }
+
+
+  /*
+    Maximum overs completed.
+  */
+
+  if (
+    score.legal >=
+    maximumBalls
+  ) {
+
+    await oversCompleted(score);
+
+    return;
+  }
+
+
+  /*
+    New batsman after wicket.
+  */
+
+  if (
+    x.wicket &&
+    (
+      !state.striker ||
+      !state.non
+    )
+  ) {
+
+    alert(
+      'Wicket! Select the new batsman.'
     );
 
+    return;
+  }
 
-if (stateError) {
 
-  console.error(
-    'Unable to save current player state:',
-    stateError
-  );
+  /*
+    New bowler after over.
+  */
 
-  alert(
-    'Score saved, but current player state could not be saved.'
-  );
+  if (overCompleted) {
 
-  return;
+    alert(
+      `Over ${Math.floor(newLegal / 6)} completed. Select a new bowler.`
+    );
+
+    return;
+  }
 }
 
 
-/*
-  Keep local object synchronized.
-*/
-
-innings.striker_id =
-  state.striker || null;
-
-innings.non_striker_id =
-  state.non || null;
-
-innings.bowler_id =
-  state.bowler || null;
-
-
-fillSelects();
-
-await refresh();
 /* =========================
    OVERS COMPLETED
 ========================= */
-
 async function oversCompleted(score) {
 
   /*
-    FIRST INNINGS
+    First innings.
   */
 
-  if (innings.innings_no === 1) {
+  if (
+    innings.innings_no === 1
+  ) {
 
-    await completeFirstInnings(score);
+    await completeFirstInnings(
+      score
+    );
 
     return;
   }
 
+
   /*
-    SECOND INNINGS
+    Second innings.
   */
 
-  if (innings.innings_no === 2) {
+  if (
+    innings.innings_no === 2
+  ) {
 
     await finishSecond(false);
 
@@ -838,66 +1525,98 @@ async function oversCompleted(score) {
   }
 }
 
+
 /* =========================
    COMPLETE FIRST INNINGS
 ========================= */
 
 async function completeFirstInnings(score) {
 
-  const target = score.runs + 1;
+  const target =
+    score.runs + 1;
+
 
   /*
-    Complete first innings.
+    Complete innings 1.
   */
 
-  const { error: firstError } = await supabase
-    .from('innings')
-    .update({
-      status: 'completed'
-    })
-    .eq('id', innings.id);
+  const {
+    error: firstError
+  } =
+    await supabase
+      .from('innings')
+      .update({
+
+        status: 'completed'
+
+      })
+      .eq(
+        'id',
+        innings.id
+      );
+
 
   if (firstError) {
-    alert(firstError.message);
+
+    alert(
+      firstError.message
+    );
+
     return;
   }
 
+
   /*
-    Check whether innings 2 already exists.
+    Check whether innings 2
+    already exists.
   */
 
-  const { data: existingSecond, error: checkError } =
+  const {
+    data: existingSecond,
+    error: checkError
+  } =
     await supabase
       .from('innings')
       .select('*')
-      .eq('match_id', matchId)
-      .eq('innings_no', 2)
+      .eq(
+        'match_id',
+        matchId
+      )
+      .eq(
+        'innings_no',
+        2
+      )
       .maybeSingle();
 
+
   if (checkError) {
-    alert(checkError.message);
+
+    alert(
+      checkError.message
+    );
+
     return;
   }
 
+
   /*
-    If second innings does not exist,
-    create it.
+    Create innings 2.
   */
 
   if (!existingSecond) {
 
-    const { error: secondError } =
+    const {
+      error: secondError
+    } =
       await supabase
         .from('innings')
         .insert({
 
-          match_id: matchId,
+          match_id:
+            matchId,
 
-          innings_no: 2,
-
-          /*
-            Teams change roles.
-          */
+          innings_no:
+            2,
 
           batting_team_id:
             innings.bowling_team_id,
@@ -905,55 +1624,111 @@ async function completeFirstInnings(score) {
           bowling_team_id:
             innings.batting_team_id,
 
-          target: target,
+          target:
+            target,
 
-          status: 'live'
+          status:
+            'live',
+
+          striker_id:
+            null,
+
+          non_striker_id:
+            null,
+
+          bowler_id:
+            null
         });
 
+
     if (secondError) {
-      alert(secondError.message);
+
+      alert(
+        secondError.message
+      );
+
       return;
     }
 
   } else {
 
     /*
-      If innings 2 exists,
-      make sure it becomes live.
+      Activate existing innings 2.
     */
 
-    const { error: activateError } =
+    const {
+      error: activateError
+    } =
       await supabase
         .from('innings')
         .update({
-          status: 'live',
-          target: target
+
+          status:
+            'live',
+
+          target:
+            target,
+
+          striker_id:
+            null,
+
+          non_striker_id:
+            null,
+
+          bowler_id:
+            null
+
         })
-        .eq('id', existingSecond.id);
+        .eq(
+          'id',
+          existingSecond.id
+        );
+
 
     if (activateError) {
-      alert(activateError.message);
+
+      alert(
+        activateError.message
+      );
+
       return;
     }
   }
 
+
   /*
-    Update match to innings 2.
+    Update match.
   */
 
-  const { error: matchError } =
+  const {
+    error: matchError
+  } =
     await supabase
       .from('matches')
       .update({
-        status: 'live',
-        current_innings: 2
+
+        status:
+          'live',
+
+        current_innings:
+          2
+
       })
-      .eq('id', matchId);
+      .eq(
+        'id',
+        matchId
+      );
+
 
   if (matchError) {
-    alert(matchError.message);
+
+    alert(
+      matchError.message
+    );
+
     return;
   }
+
 
   alert(
     `✓ ${match.overs} Overs Completed!\n\n` +
@@ -963,15 +1738,17 @@ async function completeFirstInnings(score) {
     `Starting Innings 2...`
   );
 
+
   /*
     Reload scorer.
 
-    load() will now find the
-    second innings as active.
+    load() will find innings 2.
   */
 
-  location.href = `scorer.html?id=${matchId}`;
+  location.href =
+    `scorer.html?id=${matchId}`;
 }
+
 
 /* =========================
    FIRST INNINGS SCORE
@@ -979,38 +1756,70 @@ async function completeFirstInnings(score) {
 
 async function firstScore() {
 
-  const { data: firstInnings, error } =
+  const {
+    data: firstInnings,
+    error
+  } =
     await supabase
       .from('innings')
       .select('id')
-      .eq('match_id', matchId)
-      .eq('innings_no', 1)
+      .eq(
+        'match_id',
+        matchId
+      )
+      .eq(
+        'innings_no',
+        1
+      )
       .maybeSingle();
 
-  if (error || !firstInnings) {
+
+  if (
+    error ||
+    !firstInnings
+  ) {
+
     return 0;
   }
 
-  const { data } =
+
+  const {
+    data
+  } =
     await supabase
       .from('deliveries')
       .select('total_runs')
-      .eq('innings_id', firstInnings.id);
+      .eq(
+        'innings_id',
+        firstInnings.id
+      );
 
-  return (data || []).reduce(
+
+  return (
+    data || []
+  ).reduce(
     (sum, ball) =>
-      sum + Number(ball.total_runs || 0),
+      sum +
+      Number(
+        ball.total_runs || 0
+      ),
     0
   );
 }
+
 
 /* =========================
    FINISH SECOND INNINGS
 ========================= */
 
-async function finishSecond(targetReached = false) {
+async function finishSecond(
+  targetReached = false
+) {
 
-  if (!innings) return;
+  if (!innings) {
+    return;
+  }
+
 
   const currentDeliveries =
     await deliveries();
@@ -1021,58 +1830,84 @@ async function finishSecond(targetReached = false) {
   const firstRuns =
     await firstScore();
 
+
   const battingTeam =
     innings.batting_team_id;
 
   const bowlingTeam =
     innings.bowling_team_id;
 
+
   const battingName =
-    battingTeam === match.team_a.id
+    battingTeam ===
+    match.team_a.id
+
       ? match.team_a.name
       : match.team_b.name;
+
 
   const bowlingName =
-    bowlingTeam === match.team_a.id
+    bowlingTeam ===
+    match.team_a.id
+
       ? match.team_a.name
       : match.team_b.name;
 
-  let winnerTeamId = null;
-  let resultText = '';
+
+  let winnerTeamId =
+    null;
+
+  let resultText =
+    '';
+
 
   /*
-    CHASING TEAM WINS
+    CHASING TEAM WINS.
   */
 
-  if (score.runs > firstRuns) {
+  if (
+    score.runs >
+    firstRuns
+  ) {
 
-    winnerTeamId = battingTeam;
+    winnerTeamId =
+      battingTeam;
+
 
     const wicketsRemaining =
-      10 - score.wickets;
+      Math.max(
+        0,
+        10 - score.wickets
+      );
+
 
     resultText =
       `${battingName} won by ` +
       `${wicketsRemaining} wicket(s)`;
-
   }
 
+
   /*
-    FIRST BATTING TEAM WINS
+    FIRST BATTING TEAM WINS.
   */
 
-  else if (score.runs < firstRuns) {
+  else if (
+    score.runs <
+    firstRuns
+  ) {
 
-    winnerTeamId = bowlingTeam;
+    winnerTeamId =
+      bowlingTeam;
+
 
     resultText =
       `${bowlingName} won by ` +
       `${firstRuns - score.runs} run(s)`;
-
   }
 
+
   /*
-    TIE
+    TIE.
   */
 
   else {
@@ -1081,80 +1916,127 @@ async function finishSecond(targetReached = false) {
       'Match tied';
   }
 
+
   /*
     Complete innings 2.
   */
 
-  const { error: inningsError } =
+  const {
+    error: inningsError
+  } =
     await supabase
       .from('innings')
       .update({
-        status: 'completed'
+
+        status:
+          'completed'
+
       })
-      .eq('id', innings.id);
+      .eq(
+        'id',
+        innings.id
+      );
+
 
   if (inningsError) {
-    alert(inningsError.message);
+
+    alert(
+      inningsError.message
+    );
+
     return;
   }
+
 
   /*
     Complete match.
   */
 
   const updateData = {
-    status: 'completed',
-    winner_team_id: winnerTeamId,
-    result_text: resultText
+
+    status:
+      'completed',
+
+    winner_team_id:
+      winnerTeamId,
+
+    result_text:
+      resultText,
+
+    completed_at:
+      new Date().toISOString()
   };
 
-  const { error: matchError } =
+
+  const {
+    error: matchError
+  } =
     await supabase
       .from('matches')
       .update(updateData)
-      .eq('id', matchId);
+      .eq(
+        'id',
+        matchId
+      );
+
 
   if (matchError) {
-    alert(matchError.message);
+
+    alert(
+      matchError.message
+    );
+
     return;
   }
 
-  match.status = 'completed';
+
+  match.status =
+    'completed';
+
 
   alert(
     targetReached
+
       ? `TARGET REACHED!\n\n${resultText}`
+
       : `MATCH COMPLETED!\n\n${resultText}`
   );
+
 
   location.href =
     `match.html?id=${matchId}`;
 }
 
+
 /* =========================
    RUN BUTTONS
 ========================= */
-
 document
   .querySelectorAll('[data-run]')
   .forEach(button => {
 
-    button.onclick = () => {
+    button.onclick =
+      () => {
 
-      const runs =
-        Number(button.dataset.run);
+        const runs =
+          Number(
+            button.dataset.run
+          );
 
-      record({
-        bat: runs,
 
-        commentary:
-          runs === 0
-            ? 'Dot ball'
-            : `${runs} run(s)`
-      });
+        record({
 
-    };
+          bat:
+            runs,
+
+          commentary:
+            runs === 0
+              ? 'Dot ball'
+              : `${runs} run(s)`
+        });
+      };
   });
+
 
 /* =========================
    WIDE
@@ -1162,26 +2044,42 @@ document
 
 if ($('wide')) {
 
-  $('wide').onclick = () => {
+  $('wide').onclick =
+    () => {
 
-    const runs = Number(
-      prompt(
-        'Enter total wide runs',
-        '1'
-      )
-    );
+      const runs =
+        Number(
+          prompt(
+            'Enter total wide runs',
+            '1'
+          )
+        );
 
-    if (!runs || runs < 1) {
-      alert('Invalid wide runs.');
-      return;
-    }
 
-    record({
-      wide: runs,
-      commentary: `${runs} wide run(s)`
-    });
-  };
+      if (
+        !Number.isFinite(runs) ||
+        runs < 1
+      ) {
+
+        alert(
+          'Invalid wide runs.'
+        );
+
+        return;
+      }
+
+
+      record({
+
+        wide:
+          runs,
+
+        commentary:
+          `${runs} wide run(s)`
+      });
+    };
 }
+
 
 /* =========================
    NO BALL
@@ -1189,80 +2087,133 @@ if ($('wide')) {
 
 if ($('noBall')) {
 
-  $('noBall').onclick = () => {
+  $('noBall').onclick =
+    () => {
 
-    const batRuns = Number(
-      prompt(
-        'Bat runs from this no-ball',
-        '0'
-      )
-    );
+      const batRuns =
+        Number(
+          prompt(
+            'Bat runs from this no-ball',
+            '0'
+          )
+        );
 
-    if (
-      Number.isNaN(batRuns) ||
-      batRuns < 0
-    ) {
-      alert('Invalid runs.');
-      return;
-    }
 
-    record({
-      noBall: 1,
-      bat: batRuns,
-      commentary:
-        `No ball + ${batRuns} bat run(s)`
-    });
-  };
+      if (
+        !Number.isFinite(
+          batRuns
+        ) ||
+        batRuns < 0
+      ) {
+
+        alert(
+          'Invalid runs.'
+        );
+
+        return;
+      }
+
+
+      record({
+
+        noBall:
+          1,
+
+        bat:
+          batRuns,
+
+        commentary:
+          `No ball + ${batRuns} bat run(s)`
+      });
+    };
 }
 
+
 /* =========================
-   BYES
+   BYE
 ========================= */
 
 if ($('bye')) {
 
-  $('bye').onclick = () => {
+  $('bye').onclick =
+    () => {
 
-    const runs = Number(
-      prompt('Bye runs', '1')
-    );
+      const runs =
+        Number(
+          prompt(
+            'Enter bye runs',
+            '1'
+          )
+        );
 
-    if (!runs || runs < 1) {
-      alert('Invalid bye runs.');
-      return;
-    }
 
-    record({
-      bye: runs,
-      commentary: `${runs} bye run(s)`
-    });
-  };
+      if (
+        !Number.isFinite(runs) ||
+        runs < 1
+      ) {
+
+        alert(
+          'Invalid bye runs.'
+        );
+
+        return;
+      }
+
+
+      record({
+
+        bye:
+          runs,
+
+        commentary:
+          `${runs} bye run(s)`
+      });
+    };
 }
 
+
 /* =========================
-   LEG BYES
+   LEG BYE
 ========================= */
 
 if ($('legBye')) {
 
-  $('legBye').onclick = () => {
+  $('legBye').onclick =
+    () => {
 
-    const runs = Number(
-      prompt('Leg bye runs', '1')
-    );
+      const runs =
+        Number(
+          prompt(
+            'Enter leg-bye runs',
+            '1'
+          )
+        );
 
-    if (!runs || runs < 1) {
-      alert('Invalid leg-bye runs.');
-      return;
-    }
 
-    record({
-      legBye: runs,
-      commentary:
-        `${runs} leg-bye run(s)`
-    });
-  };
+      if (
+        !Number.isFinite(runs) ||
+        runs < 1
+      ) {
+
+        alert(
+          'Invalid leg-bye runs.'
+        );
+
+        return;
+      }
+
+
+      record({
+
+        legBye:
+          runs,
+
+        commentary:
+          `${runs} leg-bye run(s)`
+      });
+    };
 }
+
 
 /* =========================
    WICKET
@@ -1270,180 +2221,75 @@ if ($('legBye')) {
 
 if ($('wicket')) {
 
-  $('wicket').onclick = () => {
-
-    if (
-      !state.striker ||
-      !state.non
-    ) {
-      alert('Select batsmen first.');
-      return;
-    }
-
-    const dismissedOptions = `
-      <option value="${state.striker}">
-        ${esc(
-          batting.find(
-            p => p.id === state.striker
-          )?.name || 'Striker'
-        )}
-      </option>
-
-      <option value="${state.non}">
-        ${esc(
-          batting.find(
-            p => p.id === state.non
-          )?.name || 'Non-striker'
-        )}
-      </option>
-    `;
-
-    const availablePlayers =
-      batting.filter(
-        p =>
-          p.id !== state.striker &&
-          p.id !== state.non
-      );
-
-    const newPlayerOptions =
-      availablePlayers.map(p => `
-        <option value="${p.id}">
-          ${esc(p.name)}
-        </option>
-      `).join('');
-
-    const dismissed =
-      prompt(
-        'Who is out?\n\n1 = Striker\n2 = Non-striker',
-        '1'
-      );
-
-    let dismissedId;
-
-    if (dismissed === '1') {
-      dismissedId = state.striker;
-    } else if (dismissed === '2') {
-      dismissedId = state.non;
-    } else {
-      return;
-    }
-
-    const dismissal =
-      prompt(
-        'Dismissal type\nBowled / Caught / LBW / Run Out / Stumped',
-        'Bowled'
-      );
-
-    if (!dismissal) return;
-
-    /*
-      Simple new batsman selection.
-    */
-
-    const availableNames =
-      availablePlayers
-        .map(
-          (p, index) =>
-            `${index + 1}. ${p.name}`
-        )
-        .join('\n');
-
-    if (!availableNames) {
-
-      /*
-        No players remaining.
-        Record wicket and finish innings.
-      */
-
-      record({
-        wicket: true,
-        dismissed: dismissedId,
-        dismissal,
-        commentary: `WICKET! ${dismissal}`
-      });
-
-      return;
-    }
-
-    const playerChoice = Number(
-      prompt(
-        `Select new batsman:\n\n${availableNames}`,
-        '1'
-      )
-    );
-
-    const newBatsman =
-      availablePlayers[playerChoice - 1];
-
-    if (!newBatsman) {
-      alert('Invalid batsman.');
-      return;
-    }
-
-    record({
-      wicket: true,
-
-      dismissed: dismissedId,
-
-      newBatsman: newBatsman.id,
-
-      dismissal,
-
-      commentary:
-        `WICKET! ${dismissal}`
-    });
-  };
-}
-
-/* =========================
-   UNDO LAST BALL
-========================= */
-
-if ($('undo')) {
-
-  $('undo').onclick =
-    async () => {
-
-      const d =
-        await deliveries();
-
-      const last =
-        d[d.length - 1];
-
-      if (!last) {
-        alert('No ball available to undo.');
-        return;
-      }
+  $('wicket').onclick =
+    () => {
 
       if (
-        !confirm(
-          'Undo the last ball?'
-        )
+        !state.striker &&
+        !state.non
       ) {
+
+        alert(
+          'No batsman is currently selected.'
+        );
+
         return;
       }
 
-      const { error } =
-        await supabase
-          .from('deliveries')
-          .delete()
-          .eq('id', last.id);
 
-      if (error) {
-        alert(error.message);
+      const dismissed =
+        prompt(
+          'Enter dismissed player ID:\n\n' +
+          'Use the player currently selected as striker or non-striker.'
+        );
+
+
+      if (!dismissed) {
         return;
       }
 
-      await rebuildState();
 
-      fillSelects();
+      let dismissal =
+        prompt(
+          'Dismissal type\n\n' +
+          'Examples:\n' +
+          'Bowled\n' +
+          'Caught\n' +
+          'LBW\n' +
+          'Stumped\n' +
+          'Run Out\n' +
+          'Hit Wicket',
+          'Bowled'
+        );
 
-      await refresh();
+
+      if (!dismissal) {
+
+        dismissal =
+          'Bowled';
+      }
+
+
+      record({
+
+        wicket:
+          true,
+
+        dismissed:
+          dismissed,
+
+        dismissal:
+          dismissal,
+
+        commentary:
+          `Wicket — ${dismissal}`
+      });
     };
 }
 
+
 /* =========================
-   PAUSE MATCH
+   PAUSE
 ========================= */
 
 if ($('pauseMatch')) {
@@ -1451,34 +2297,48 @@ if ($('pauseMatch')) {
   $('pauseMatch').onclick =
     async () => {
 
-      const { error } =
+      const {
+        error
+      } =
         await supabase
           .from('matches')
           .update({
-            status: 'paused'
+
+            status:
+              'paused'
+
           })
-          .eq('id', matchId);
+          .eq(
+            'id',
+            matchId
+          );
+
 
       if (error) {
-        alert(error.message);
+
+        alert(
+          error.message
+        );
+
         return;
       }
 
-      await supabase
-        .from('innings')
-        .update({
-          status: 'paused'
-        })
-        .eq('id', innings.id);
 
-      match.status = 'paused';
+      match.status =
+        'paused';
 
-      alert('Match paused.');
+
+      alert(
+        'Match paused.'
+      );
+
+      await refresh();
     };
 }
 
+
 /* =========================
-   RESUME MATCH
+   RESUME
 ========================= */
 
 if ($('resumeMatch')) {
@@ -1486,124 +2346,70 @@ if ($('resumeMatch')) {
   $('resumeMatch').onclick =
     async () => {
 
-      const { error } =
+      const {
+        error
+      } =
         await supabase
           .from('matches')
           .update({
-            status: 'live'
+
+            status:
+              'live'
+
           })
-          .eq('id', matchId);
+          .eq(
+            'id',
+            matchId
+          );
+
 
       if (error) {
-        alert(error.message);
+
+        alert(
+          error.message
+        );
+
         return;
       }
 
-      await supabase
-        .from('innings')
-        .update({
-          status: 'live'
-        })
-        .eq('id', innings.id);
 
-      match.status = 'live';
+      match.status =
+        'live';
 
-      alert('Match resumed.');
+
+      alert(
+        'Match resumed.'
+      );
+
+      await refresh();
     };
 }
 
-/* =========================
-   MANUAL END INNINGS
-========================= */
-
-if ($('endInnings')) {
-
-  $('endInnings').onclick =
-    async () => {
-
-      if (
-        !confirm(
-          'Are you sure you want to end this innings?'
-        )
-      ) {
-        return;
-      }
-
-      const d = await deliveries();
-      const score = calc(d);
-
-      if (innings.innings_no === 1) {
-
-        await completeFirstInnings(score);
-
-      } else {
-
-        await finishSecond(false);
-
-      }
-    };
-}
 
 /* =========================
-   END MATCH
+   INITIALIZE
 ========================= */
 
-if ($('endMatch')) {
-
-  $('endMatch').onclick =
-    async () => {
-
-      if (
-        !confirm(
-          'End this match now?'
-        )
-      ) {
-        return;
-      }
-
-      if (innings.innings_no === 2) {
-
-        await finishSecond(false);
-
-        return;
-      }
-
-      const { error } =
-        await supabase
-          .from('matches')
-          .update({
-            status: 'completed',
-            result_text:
-              'Match ended by administrator'
-          })
-          .eq('id', matchId);
-
-      if (error) {
-        alert(error.message);
-        return;
-      }
-
-      location.href =
-        `match.html?id=${matchId}`;
-    };
-}
-
-/* =========================
-   START APPLICATION
-========================= */
-
-(async () => {
+(async function init() {
 
   const authenticated =
     await ensureAuth();
 
-  if (!authenticated) return;
 
-  if (!matchId) {
-    alert('Match ID is missing.');
-    location.href = 'admin.html';
+  if (!authenticated) {
     return;
   }
+
+
+  if (!matchId) {
+
+    alert(
+      'Match ID is missing.'
+    );
+
+    return;
+  }
+
 
   await load();
 
