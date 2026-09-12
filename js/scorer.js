@@ -203,31 +203,136 @@ async function load() {
    REBUILD CURRENT STATE
 ========================= */
 
+/* =========================
+   REBUILD CURRENT STATE
+========================= */
+
 async function rebuildState() {
+
+  /*
+    FIRST PRIORITY:
+    Read the current state saved
+    in the innings table.
+  */
+
+  if (
+    innings.striker_id ||
+    innings.non_striker_id ||
+    innings.bowler_id
+  ) {
+
+    state = {
+
+      striker:
+        innings.striker_id || null,
+
+      non:
+        innings.non_striker_id || null,
+
+      bowler:
+        innings.bowler_id || null
+
+    };
+
+    return;
+  }
+
+
+  /*
+    BACKWARD COMPATIBILITY
+
+    If old innings does not have
+    saved player state, reconstruct
+    it from deliveries.
+  */
 
   const d = await deliveries();
 
-  /*
-    New innings.
-  */
 
   if (!d.length) {
+
     state = {
       striker: null,
       non: null,
       bowler: null
     };
+
     return;
   }
 
-  const last = d[d.length - 1];
+
+  const last =
+    d[d.length - 1];
+
 
   state = {
-    striker: last.striker_id,
-    non: last.non_striker_id,
-    bowler: last.bowler_id
+
+    striker:
+      last.striker_id,
+
+    non:
+      last.non_striker_id,
+
+    bowler:
+      last.bowler_id
+
   };
 
+
+  /*
+    Running runs change ends.
+  */
+
+  const runningRuns =
+    Number(last.batsman_runs || 0) +
+    Number(last.extras_byes || 0) +
+    Number(last.extras_legbyes || 0);
+
+
+  if (runningRuns % 2 !== 0) {
+
+    [
+      state.striker,
+      state.non
+    ] =
+    [
+      state.non,
+      state.striker
+    ];
+
+  }
+
+
+  /*
+    Over completed.
+  */
+
+  const legalBalls =
+    d.filter(
+      x => x.legal_ball
+    ).length;
+
+
+  if (
+    legalBalls > 0 &&
+    legalBalls % 6 === 0 &&
+    last.legal_ball
+  ) {
+
+    [
+      state.striker,
+      state.non
+    ] =
+    [
+      state.non,
+      state.striker
+    ];
+
+    state.bowler = null;
+
+  }
+
+}
   /*
     Strike changes for odd runs.
 
