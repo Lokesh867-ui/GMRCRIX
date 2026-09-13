@@ -78,6 +78,131 @@ async function deliveries() {
 
 
 /* =========================
+   PREVIOUS OVER BOWLER
+========================= */
+
+async function getPreviousOverBowler() {
+
+  const d = await deliveries();
+
+  if (!d.length) {
+    return null;
+  }
+
+  /*
+    Count only legal balls.
+
+    Example:
+    6 legal balls = first over completed
+    12 legal balls = second over completed
+    etc.
+  */
+
+  const legalBalls =
+    d.filter(
+      x => x.legal_ball
+    ).length;
+
+
+  /*
+    If no complete over has finished,
+    there is no previous over.
+  */
+
+  if (legalBalls < 6) {
+    return null;
+  }
+
+
+  /*
+    Current over number.
+
+    Example:
+    6 balls completed
+    current over = 1
+    previous over = 0
+  */
+
+  const currentOver =
+    Math.floor(
+      legalBalls / 6
+    );
+
+
+  const previousOver =
+    currentOver - 1;
+
+
+  /*
+    Get legal deliveries from the
+    previous completed over.
+  */
+
+  const previousBalls =
+    d.filter(
+      x =>
+        x.over_number === previousOver &&
+        x.legal_ball &&
+        x.bowler_id
+    );
+
+
+  if (!previousBalls.length) {
+    return null;
+  }
+
+
+  /*
+    The bowler of the previous over.
+  */
+
+  return previousBalls[0].bowler_id;
+}
+
+
+/* =========================
+   CHECK BOWLER RULE
+========================= */
+
+async function checkBowlerRule(bowlerId) {
+
+  if (!bowlerId) {
+    return true;
+  }
+
+
+  const previousOverBowler =
+    await getPreviousOverBowler();
+
+
+  /*
+    First over:
+    any bowler is allowed.
+  */
+
+  if (!previousOverBowler) {
+    return true;
+  }
+
+
+  /*
+    Same bowler cannot bowl
+    consecutive overs.
+  */
+
+  if (
+    previousOverBowler === bowlerId
+  ) {
+
+    return false;
+  }
+
+
+  return true;
+}
+
+
+/* =========================
    CALCULATE SCORE
 ========================= */
 
@@ -523,6 +648,31 @@ async function saveCurrentState() {
 
     alert(
       'Please select striker, non-striker and bowler.'
+    );
+
+    return false;
+  }
+
+
+  /*
+    FINAL BOWLER RULE CHECK
+
+    This prevents the same bowler
+    from bowling consecutive overs.
+  */
+
+  const bowlerAllowed =
+    await checkBowlerRule(
+      state.bowler
+    );
+
+
+  if (!bowlerAllowed) {
+
+    alert(
+      '❌ INVALID BOWLER\n\n' +
+      'The same bowler cannot bowl consecutive overs.\n\n' +
+      'Please select a different bowler.'
     );
 
     return false;
@@ -984,6 +1134,28 @@ if ($('savePlayers')) {
       }
 
 
+      /*
+        Check bowler before saving.
+      */
+
+      const bowlerAllowed =
+        await checkBowlerRule(
+          bowler
+        );
+
+
+      if (!bowlerAllowed) {
+
+        alert(
+          '❌ INVALID BOWLER\n\n' +
+          'The same bowler cannot bowl consecutive overs.\n\n' +
+          'Please select a different bowler.'
+        );
+
+        return;
+      }
+
+
       state = {
 
         striker,
@@ -1078,6 +1250,32 @@ async function record(x) {
 
     alert(
       'Select striker, non-striker and bowler first.'
+    );
+
+    return;
+  }
+
+
+  /*
+    FINAL SAFETY CHECK
+
+    Prevent an illegal consecutive
+    bowler even if record() is called
+    directly.
+  */
+
+  const bowlerAllowed =
+    await checkBowlerRule(
+      state.bowler
+    );
+
+
+  if (!bowlerAllowed) {
+
+    alert(
+      '❌ ILLEGAL BOWLER\n\n' +
+      'The same bowler cannot bowl consecutive overs.\n\n' +
+      'Select a different bowler before recording this ball.'
     );
 
     return;
@@ -1297,6 +1495,13 @@ async function record(x) {
     ];
 
 
+    /*
+      Clear bowler after the over.
+
+      This forces the scorer to select
+      a new bowler for the next over.
+    */
+
     state.bowler = null;
   }
 
@@ -1307,7 +1512,6 @@ async function record(x) {
     If a wicket or over has created
     an empty player position,
     saveCurrentState cannot save null.
-    In that case we do NOT call it yet.
   */
 
   if (
@@ -1329,8 +1533,8 @@ async function record(x) {
     /*
       Save partial state directly.
 
-      This is important after a wicket
-      or completed over.
+      Important after wicket or
+      completed over.
     */
 
     const {
@@ -1456,7 +1660,7 @@ async function record(x) {
     if (overCompleted) {
 
       alert(
-        `Over ${Math.floor(newLegal / 6)} completed. Select a new bowler.`
+        `Over ${Math.floor(newLegal / 6)} completed. Select a different bowler.`
       );
 
       return;
@@ -1510,7 +1714,7 @@ async function record(x) {
   if (overCompleted) {
 
     alert(
-      `Over ${Math.floor(newLegal / 6)} completed. Select a new bowler.`
+      `Over ${Math.floor(newLegal / 6)} completed. Select a different bowler.`
     );
 
     return;
