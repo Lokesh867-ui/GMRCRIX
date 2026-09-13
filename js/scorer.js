@@ -38,7 +38,9 @@ async function ensureAuth() {
   } = await supabase.auth.getSession();
 
   if (!session) {
+
     location.href = 'admin.html';
+
     return false;
   }
 
@@ -52,16 +54,20 @@ async function ensureAuth() {
 
 async function deliveries() {
 
-  if (!innings) return [];
+  if (!innings) {
+    return [];
+  }
 
-  const { data, error } =
-    await supabase
-      .from('deliveries')
-      .select('*')
-      .eq('innings_id', innings.id)
-      .order('created_at', {
-        ascending: true
-      });
+  const {
+    data,
+    error
+  } = await supabase
+    .from('deliveries')
+    .select('*')
+    .eq('innings_id', innings.id)
+    .order('created_at', {
+      ascending: true
+    });
 
   if (error) {
 
@@ -89,54 +95,22 @@ async function getPreviousOverBowler() {
     return null;
   }
 
-  /*
-    Count only legal balls.
-
-    Example:
-    6 legal balls = first over completed
-    12 legal balls = second over completed
-    etc.
-  */
-
   const legalBalls =
     d.filter(
       x => x.legal_ball
     ).length;
 
-
-  /*
-    If no complete over has finished,
-    there is no previous over.
-  */
-
   if (legalBalls < 6) {
     return null;
   }
-
-
-  /*
-    Current over number.
-
-    Example:
-    6 balls completed
-    current over = 1
-    previous over = 0
-  */
 
   const currentOver =
     Math.floor(
       legalBalls / 6
     );
 
-
   const previousOver =
     currentOver - 1;
-
-
-  /*
-    Get legal deliveries from the
-    previous completed over.
-  */
 
   const previousBalls =
     d.filter(
@@ -146,15 +120,9 @@ async function getPreviousOverBowler() {
         x.bowler_id
     );
 
-
   if (!previousBalls.length) {
     return null;
   }
-
-
-  /*
-    The bowler of the previous over.
-  */
 
   return previousBalls[0].bowler_id;
 }
@@ -170,35 +138,14 @@ async function checkBowlerRule(bowlerId) {
     return true;
   }
 
-
   const previousOverBowler =
     await getPreviousOverBowler();
-
-
-  /*
-    First over:
-    any bowler is allowed.
-  */
 
   if (!previousOverBowler) {
     return true;
   }
 
-
-  /*
-    Same bowler cannot bowl
-    consecutive overs.
-  */
-
-  if (
-    previousOverBowler === bowlerId
-  ) {
-
-    return false;
-  }
-
-
-  return true;
+  return previousOverBowler !== bowlerId;
 }
 
 
@@ -211,7 +158,8 @@ function calc(d) {
   const runs =
     d.reduce(
       (sum, ball) =>
-        sum + Number(ball.total_runs || 0),
+        sum +
+        Number(ball.total_runs || 0),
       0
     );
 
@@ -226,9 +174,13 @@ function calc(d) {
     ).length;
 
   return {
+
     runs,
+
     wickets,
+
     legal,
+
     overs:
       `${Math.floor(legal / 6)}.${legal % 6}`
   };
@@ -241,16 +193,18 @@ function calc(d) {
 
 async function load() {
 
-  const { data: m, error } =
-    await supabase
-      .from('matches')
-      .select(`
-        *,
-        team_a:teams!matches_team_a_id_fkey(id,name),
-        team_b:teams!matches_team_b_id_fkey(id,name)
-      `)
-      .eq('id', matchId)
-      .single();
+  const {
+    data: m,
+    error
+  } = await supabase
+    .from('matches')
+    .select(`
+      *,
+      team_a:teams!matches_team_a_id_fkey(id,name),
+      team_b:teams!matches_team_b_id_fkey(id,name)
+    `)
+    .eq('id', matchId)
+    .single();
 
   if (error) {
 
@@ -265,24 +219,19 @@ async function load() {
   match = m;
 
 
-  /* =========================
-     FIND LIVE INNINGS
-  ========================= */
-
   const {
     data: i,
     error: inningsError
-  } =
-    await supabase
-      .from('innings')
-      .select('*')
-      .eq('match_id', matchId)
-      .eq('status', 'live')
-      .order('innings_no', {
-        ascending: false
-      })
-      .limit(1)
-      .maybeSingle();
+  } = await supabase
+    .from('innings')
+    .select('*')
+    .eq('match_id', matchId)
+    .eq('status', 'live')
+    .order('innings_no', {
+      ascending: false
+    })
+    .limit(1)
+    .maybeSingle();
 
   if (inningsError) {
 
@@ -310,22 +259,17 @@ async function load() {
   }
 
 
-  /* =========================
-     LOAD PLAYING XI
-  ========================= */
-
   const {
     data: mp,
     error: mpError
-  } =
-    await supabase
-      .from('match_players')
-      .select(`
-        team_id,
-        players(id,name,role)
-      `)
-      .eq('match_id', matchId)
-      .eq('is_playing_xi', true);
+  } = await supabase
+    .from('match_players')
+    .select(`
+      team_id,
+      players(id,name,role)
+    `)
+    .eq('match_id', matchId)
+    .eq('is_playing_xi', true);
 
   if (mpError) {
 
@@ -364,15 +308,12 @@ async function load() {
       .filter(Boolean);
 
 
-  /* =========================
-     PAGE INFORMATION
-  ========================= */
-
   if ($('title')) {
 
     $('title').textContent =
       `${match.team_a.name} vs ${match.team_b.name}`;
   }
+
 
   if ($('inningsTitle')) {
 
@@ -380,11 +321,13 @@ async function load() {
       `Innings ${innings.innings_no} · LIVE`;
   }
 
+
   if ($('target')) {
 
     $('target').textContent =
       innings.target || '—';
   }
+
 
   if ($('publicLink')) {
 
@@ -392,10 +335,6 @@ async function load() {
       `match.html?id=${matchId}`;
   }
 
-
-  /* =========================
-     RESTORE CURRENT PLAYERS
-  ========================= */
 
   await rebuildState();
 
@@ -410,11 +349,6 @@ async function load() {
 ========================= */
 
 async function rebuildState() {
-
-  /*
-    First use player state saved
-    directly in innings table.
-  */
 
   if (
     innings.striker_id ||
@@ -437,11 +371,6 @@ async function rebuildState() {
     return;
   }
 
-
-  /*
-    If no saved state exists,
-    rebuild from deliveries.
-  */
 
   const d =
     await deliveries();
@@ -476,10 +405,6 @@ async function rebuildState() {
   };
 
 
-  /*
-    Odd running runs change strike.
-  */
-
   const runningRuns =
     Number(last.batsman_runs || 0) +
     Number(last.extras_byes || 0) +
@@ -500,10 +425,6 @@ async function rebuildState() {
   }
 
 
-  /*
-    Wicket removes dismissed player.
-  */
-
   if (last.wicket) {
 
     if (
@@ -523,10 +444,6 @@ async function rebuildState() {
     }
   }
 
-
-  /*
-    End of over.
-  */
 
   const legalBalls =
     d.filter(
@@ -583,7 +500,7 @@ function opts(players) {
 
 
 /* =========================
-   FILL PLAYER SELECTS
+   FILL SELECTS
 ========================= */
 
 function fillSelects() {
@@ -620,7 +537,7 @@ function fillSelects() {
 
 
 /* =========================
-   SAVE CURRENT PLAYER STATE
+   SAVE CURRENT STATE
 ========================= */
 
 async function saveCurrentState() {
@@ -629,11 +546,6 @@ async function saveCurrentState() {
 
     alert(
       'ERROR: Active innings ID is missing.'
-    );
-
-    console.error(
-      'innings:',
-      innings
     );
 
     return false;
@@ -654,13 +566,6 @@ async function saveCurrentState() {
   }
 
 
-  /*
-    FINAL BOWLER RULE CHECK
-
-    This prevents the same bowler
-    from bowling consecutive overs.
-  */
-
   const bowlerAllowed =
     await checkBowlerRule(
       state.bowler
@@ -677,17 +582,6 @@ async function saveCurrentState() {
 
     return false;
   }
-
-
-  console.log(
-    'Saving player state:',
-    {
-      innings_id: innings.id,
-      striker_id: state.striker,
-      non_striker_id: state.non,
-      bowler_id: state.bowler
-    }
-  );
 
 
   const {
@@ -713,7 +607,7 @@ async function saveCurrentState() {
         innings.id
       )
       .select(
-        'id, striker_id, non_striker_id, bowler_id'
+        'id,striker_id,non_striker_id,bowler_id'
       )
       .single();
 
@@ -734,16 +628,6 @@ async function saveCurrentState() {
   }
 
 
-  console.log(
-    'PLAYER STATE SAVED:',
-    data
-  );
-
-
-  /*
-    Update local innings object.
-  */
-
   innings.striker_id =
     data.striker_id;
 
@@ -753,10 +637,6 @@ async function saveCurrentState() {
   innings.bowler_id =
     data.bowler_id;
 
-
-  /*
-    Update local state.
-  */
 
   state.striker =
     data.striker_id;
@@ -816,22 +696,16 @@ async function refresh() {
     let text =
       `Overs: ${c.overs}`;
 
-
     if (c.legal >= maxBalls) {
 
       text =
         `✓ ${match.overs} Overs Completed`;
     }
 
-
     $('overText').textContent =
       text;
   }
 
-
-  /* =========================
-     COMMENTARY
-  ========================= */
 
   if ($('commentary')) {
 
@@ -860,13 +734,11 @@ async function refresh() {
 
 
   if ($('battingStats')) {
-
     battingStats(d);
   }
 
 
   if ($('bowlingStats')) {
-
     bowlingStats(d);
   }
 }
@@ -945,7 +817,7 @@ function battingStats(d) {
 
               ${
                 state.striker === player.id
-                  ? '*'
+                  ? ' *'
                   : ''
               }
 
@@ -1043,7 +915,7 @@ function bowlingStats(d) {
 
               ${
                 state.bowler === player.id
-                  ? '*'
+                  ? ' *'
                   : ''
               }
 
@@ -1080,11 +952,6 @@ if ($('savePlayers')) {
     'click',
     async () => {
 
-      console.log(
-        'SAVE PLAYERS BUTTON CLICKED'
-      );
-
-
       const striker =
         $('striker')?.value || '';
 
@@ -1093,16 +960,6 @@ if ($('savePlayers')) {
 
       const bowler =
         $('bowler')?.value || '';
-
-
-      console.log(
-        'Selected players:',
-        {
-          striker,
-          non,
-          bowler
-        }
-      );
 
 
       if (
@@ -1133,10 +990,6 @@ if ($('savePlayers')) {
         return;
       }
 
-
-      /*
-        Check bowler before saving.
-      */
 
       const bowlerAllowed =
         await checkBowlerRule(
@@ -1178,35 +1031,8 @@ if ($('savePlayers')) {
       await refresh();
 
 
-      const strikerText =
-        $('striker')
-          ?.selectedOptions?.[0]
-          ?.text ||
-        'Unknown';
-
-
-      const nonText =
-        $('nonStriker')
-          ?.selectedOptions?.[0]
-          ?.text ||
-        'Unknown';
-
-
-      const bowlerText =
-        $('bowler')
-          ?.selectedOptions?.[0]
-          ?.text ||
-        'Unknown';
-
-
       alert(
-        '✓ PLAYERS SAVED SUCCESSFULLY\n\n' +
-        'Striker: ' +
-        strikerText.trim() +
-        '\nNon-striker: ' +
-        nonText.trim() +
-        '\nBowler: ' +
-        bowlerText.trim()
+        '✓ PLAYERS SAVED SUCCESSFULLY'
       );
     }
   );
@@ -1256,14 +1082,6 @@ async function record(x) {
   }
 
 
-  /*
-    FINAL SAFETY CHECK
-
-    Prevent an illegal consecutive
-    bowler even if record() is called
-    directly.
-  */
-
   const bowlerAllowed =
     await checkBowlerRule(
       state.bowler
@@ -1275,7 +1093,7 @@ async function record(x) {
     alert(
       '❌ ILLEGAL BOWLER\n\n' +
       'The same bowler cannot bowl consecutive overs.\n\n' +
-      'Select a different bowler before recording this ball.'
+      'Select a different bowler.'
     );
 
     return;
@@ -1329,16 +1147,6 @@ async function record(x) {
     (current.legal % 6) + 1;
 
 
-  const deliveryStriker =
-    state.striker;
-
-  const deliveryNon =
-    state.non;
-
-  const deliveryBowler =
-    state.bowler;
-
-
   const row = {
 
     innings_id:
@@ -1351,13 +1159,13 @@ async function record(x) {
       ballNumber,
 
     striker_id:
-      deliveryStriker,
+      state.striker,
 
     non_striker_id:
-      deliveryNon,
+      state.non,
 
     bowler_id:
-      deliveryBowler,
+      state.bowler,
 
     batsman_runs:
       Number(x.bat || 0),
@@ -1416,10 +1224,6 @@ async function record(x) {
   }
 
 
-  /* =========================
-     UPDATE PLAYER STATE
-  ========================= */
-
   const runningRuns =
     Number(x.bat || 0) +
     Number(x.bye || 0) +
@@ -1441,7 +1245,7 @@ async function record(x) {
 
 
   /* =========================
-     WICKET
+     WICKET STATE
   ========================= */
 
   if (x.wicket) {
@@ -1465,10 +1269,6 @@ async function record(x) {
   }
 
 
-  /* =========================
-     LEGAL BALL COUNT
-  ========================= */
-
   const newLegal =
     current.legal +
     (legalBall ? 1 : 0);
@@ -1480,10 +1280,6 @@ async function record(x) {
     newLegal % 6 === 0;
 
 
-  /* =========================
-     END OF OVER
-  ========================= */
-
   if (overCompleted) {
 
     [
@@ -1494,25 +1290,13 @@ async function record(x) {
       state.striker
     ];
 
-
-    /*
-      Clear bowler after the over.
-
-      This forces the scorer to select
-      a new bowler for the next over.
-    */
-
     state.bowler = null;
   }
 
 
-  /*
-    Save updated player state.
-
-    If a wicket or over has created
-    an empty player position,
-    saveCurrentState cannot save null.
-  */
+  /* =========================
+     SAVE STATE
+  ========================= */
 
   if (
     state.striker &&
@@ -1523,19 +1307,11 @@ async function record(x) {
     const stateSaved =
       await saveCurrentState();
 
-
     if (!stateSaved) {
       return;
     }
 
   } else {
-
-    /*
-      Save partial state directly.
-
-      Important after wicket or
-      completed over.
-    */
 
     const {
       error: partialStateError
@@ -1650,7 +1426,7 @@ async function record(x) {
     ) {
 
       alert(
-        'Wicket! Select the new batsman.'
+        'Wicket recorded.\n\nSelect the new batsman.'
       );
 
       return;
@@ -1660,12 +1436,11 @@ async function record(x) {
     if (overCompleted) {
 
       alert(
-        `Over ${Math.floor(newLegal / 6)} completed. Select a different bowler.`
+        `Over ${Math.floor(newLegal / 6)} completed.\n\nSelect a different bowler.`
       );
 
       return;
     }
-
 
     return;
   }
@@ -1704,7 +1479,7 @@ async function record(x) {
   ) {
 
     alert(
-      'Wicket! Select the new batsman.'
+      'Wicket recorded.\n\nSelect the new batsman.'
     );
 
     return;
@@ -1714,10 +1489,8 @@ async function record(x) {
   if (overCompleted) {
 
     alert(
-      `Over ${Math.floor(newLegal / 6)} completed. Select a different bowler.`
+      `Over ${Math.floor(newLegal / 6)} completed.\n\nSelect a different bowler.`
     );
-
-    return;
   }
 }
 
@@ -1745,8 +1518,6 @@ async function oversCompleted(score) {
   ) {
 
     await finishSecond(false);
-
-    return;
   }
 }
 
@@ -2038,17 +1809,13 @@ async function finishSecond(
 
 
   const battingName =
-    battingTeam ===
-    match.team_a.id
-
+    battingTeam === match.team_a.id
       ? match.team_a.name
       : match.team_b.name;
 
 
   const bowlingName =
-    bowlingTeam ===
-    match.team_a.id
-
+    bowlingTeam === match.team_a.id
       ? match.team_a.name
       : match.team_b.name;
 
@@ -2059,10 +1826,6 @@ async function finishSecond(
   let resultText =
     '';
 
-
-  /* =========================
-     CHASING TEAM WINS
-  ========================= */
 
   if (
     score.runs >
@@ -2083,14 +1846,8 @@ async function finishSecond(
     resultText =
       `${battingName} won by ` +
       `${wicketsRemaining} wicket(s)`;
-  }
 
-
-  /* =========================
-     FIRST TEAM WINS
-  ========================= */
-
-  else if (
+  } else if (
     score.runs <
     firstRuns
   ) {
@@ -2102,14 +1859,8 @@ async function finishSecond(
     resultText =
       `${bowlingName} won by ` +
       `${firstRuns - score.runs} run(s)`;
-  }
 
-
-  /* =========================
-     TIE
-  ========================= */
-
-  else {
+  } else {
 
     resultText =
       'Match tied';
@@ -2122,10 +1873,7 @@ async function finishSecond(
     await supabase
       .from('innings')
       .update({
-
-        status:
-          'completed'
-
+        status: 'completed'
       })
       .eq(
         'id',
@@ -2145,8 +1893,7 @@ async function finishSecond(
 
   const updateData = {
 
-    status:
-      'completed',
+    status: 'completed',
 
     winner_team_id:
       winnerTeamId,
@@ -2290,9 +2037,7 @@ if ($('noBall')) {
 
 
       if (
-        !Number.isFinite(
-          batRuns
-        ) ||
+        !Number.isFinite(batRuns) ||
         batRuns < 0
       ) {
 
@@ -2405,8 +2150,187 @@ if ($('legBye')) {
 }
 
 
+/* =====================================================
+   WICKET MODAL
+===================================================== */
+
+function openWicketModal() {
+
+  if (
+    !state.striker &&
+    !state.non
+  ) {
+
+    alert(
+      'No batsman is currently selected.'
+    );
+
+    return;
+  }
+
+
+  const striker =
+    batting.find(
+      p => p.id === state.striker
+    );
+
+
+  const nonStriker =
+    batting.find(
+      p => p.id === state.non
+    );
+
+
+  const modal =
+    $('modal');
+
+  const body =
+    $('modalBody');
+
+
+  if (!modal || !body) {
+    return;
+  }
+
+
+  body.innerHTML = `
+
+    <div class="wicket-section">
+
+      <h3>Who was dismissed?</h3>
+
+      <label class="wicket-option">
+
+        <input
+          type="radio"
+          name="dismissedPlayer"
+          value="${striker?.id || ''}"
+        >
+
+        <span>
+
+          <strong>
+            ${esc(striker?.name || 'Striker')}
+          </strong>
+
+          <small>
+            Striker
+          </small>
+
+        </span>
+
+      </label>
+
+
+      <label class="wicket-option">
+
+        <input
+          type="radio"
+          name="dismissedPlayer"
+          value="${nonStriker?.id || ''}"
+        >
+
+        <span>
+
+          <strong>
+            ${esc(nonStriker?.name || 'Non-striker')}
+          </strong>
+
+          <small>
+            Non-striker
+          </small>
+
+        </span>
+
+      </label>
+
+    </div>
+
+
+    <div class="wicket-section">
+
+      <h3>Dismissal type</h3>
+
+      <select id="dismissalType">
+
+        <option value="Bowled">
+          Bowled
+        </option>
+
+        <option value="Caught">
+          Caught
+        </option>
+
+        <option value="LBW">
+          LBW
+        </option>
+
+        <option value="Stumped">
+          Stumped
+        </option>
+
+        <option value="Run Out">
+          Run Out
+        </option>
+
+        <option value="Hit Wicket">
+          Hit Wicket
+        </option>
+
+        <option value="Obstructing the Field">
+          Obstructing the Field
+        </option>
+
+        <option value="Hit the Ball Twice">
+          Hit the Ball Twice
+        </option>
+
+        <option value="Retired Out">
+          Retired Out
+        </option>
+
+      </select>
+
+    </div>
+
+  `;
+
+
+  const firstRadio =
+    body.querySelector(
+      'input[name="dismissedPlayer"]'
+    );
+
+
+  if (firstRadio) {
+    firstRadio.checked = true;
+  }
+
+
+  modal.classList.remove('hidden');
+}
+
+
 /* =========================
-   WICKET
+   CLOSE WICKET MODAL
+========================= */
+
+function closeWicketModal() {
+
+  const modal =
+    $('modal');
+
+  if (modal) {
+
+    modal.classList.add(
+      'hidden'
+    );
+  }
+}
+
+
+/* =========================
+   WICKET BUTTON
 ========================= */
 
 if ($('wicket')) {
@@ -2414,67 +2338,113 @@ if ($('wicket')) {
   $('wicket').onclick =
     () => {
 
+      openWicketModal();
+
+    };
+}
+
+
+/* =========================
+   WICKET CONFIRM
+========================= */
+
+if ($('modalConfirm')) {
+
+  $('modalConfirm').onclick =
+    async () => {
+
+      const selected =
+        document.querySelector(
+          'input[name="dismissedPlayer"]:checked'
+        );
+
+
       if (
-        !state.striker &&
-        !state.non
+        !selected ||
+        !selected.value
       ) {
 
         alert(
-          'No batsman is currently selected.'
+          'Please select the dismissed batsman.'
         );
 
         return;
       }
 
 
-      const dismissed =
-        prompt(
-          'Enter dismissed player ID:\n\n' +
-          'Use the player currently selected as striker or non-striker.'
+      const dismissal =
+        $('dismissalType')?.value ||
+        'Bowled';
+
+
+      const dismissedId =
+        selected.value;
+
+
+      const dismissedPlayer =
+        batting.find(
+          p =>
+            p.id ===
+            dismissedId
         );
 
 
-      if (!dismissed) {
-        return;
-      }
+      closeWicketModal();
 
 
-      let dismissal =
-        prompt(
-          'Dismissal type\n\n' +
-          'Examples:\n' +
-          'Bowled\n' +
-          'Caught\n' +
-          'LBW\n' +
-          'Stumped\n' +
-          'Run Out\n' +
-          'Hit Wicket',
-          'Bowled'
-        );
+      await record({
 
-
-      if (!dismissal) {
-
-        dismissal =
-          'Bowled';
-      }
-
-
-      record({
-
-        wicket:
-          true,
+        wicket: true,
 
         dismissed:
-          dismissed,
+          dismissedId,
 
         dismissal:
           dismissal,
 
         commentary:
-          `Wicket — ${dismissal}`
+          `Wicket — ${dismissedPlayer?.name || 'Batsman'} (${dismissal})`
       });
+
     };
+}
+
+
+/* =========================
+   WICKET CANCEL
+========================= */
+
+if ($('modalCancel')) {
+
+  $('modalCancel').onclick =
+    () => {
+
+      closeWicketModal();
+
+    };
+}
+
+
+/* =========================
+   CLOSE MODAL OUTSIDE
+========================= */
+
+if ($('modal')) {
+
+  $('modal').addEventListener(
+    'click',
+    event => {
+
+      if (
+        event.target ===
+        $('modal')
+      ) {
+
+        closeWicketModal();
+      }
+
+    }
+  );
 }
 
 
@@ -2493,10 +2463,7 @@ if ($('pauseMatch')) {
         await supabase
           .from('matches')
           .update({
-
-            status:
-              'paused'
-
+            status: 'paused'
           })
           .eq(
             'id',
@@ -2542,10 +2509,7 @@ if ($('resumeMatch')) {
         await supabase
           .from('matches')
           .update({
-
-            status:
-              'live'
-
+            status: 'live'
           })
           .eq(
             'id',
