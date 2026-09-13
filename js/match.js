@@ -14,10 +14,29 @@ const esc = s =>
     "'": '&#39;'
   }[c]));
 
+/* ================================
+   FORMAT OVERS
+================================ */
 
-/* =========================================================
+function formatOvers(balls) {
+  return `${Math.floor(balls / 6)}.${balls % 6}`;
+}
+
+/* ================================
+   FIND PLAYER
+================================ */
+
+function findPlayer(players, id) {
+  if (!id) return null;
+
+  return players.find(
+    player => player.id === id
+  ) || null;
+}
+
+/* ================================
    CALCULATE SCORECARD
-========================================================= */
+================================ */
 
 function calculateScorecard(deliveries, players) {
 
@@ -40,7 +59,6 @@ function calculateScorecard(deliveries, players) {
 
   let legalBalls = 0;
 
-
   deliveries.forEach(ball => {
 
     totalRuns += Number(ball.total_runs || 0);
@@ -54,141 +72,113 @@ function calculateScorecard(deliveries, players) {
       legalBalls++;
     }
 
-
-    /* =========================
+    /* ================================
        BATTING
-    ========================= */
+    ================================ */
 
     if (ball.striker_id) {
 
       if (!batting[ball.striker_id]) {
 
         batting[ball.striker_id] = {
-
           id: ball.striker_id,
-
-          name:
-            playerMap[ball.striker_id] ||
-            'Unknown Player',
-
+          name: playerMap[ball.striker_id] || 'Unknown Player',
           runs: 0,
           balls: 0,
           fours: 0,
           sixes: 0,
-
           dismissal: 'not out'
         };
+
       }
 
-
-      const batsmanRuns =
+      const runs =
         Number(ball.batsman_runs || 0);
 
+      batting[ball.striker_id].runs += runs;
 
-      batting[ball.striker_id].runs +=
-        batsmanRuns;
-
-
-      if (batsmanRuns === 4) {
+      if (runs === 4) {
         batting[ball.striker_id].fours++;
       }
 
-
-      if (batsmanRuns === 6) {
+      if (runs === 6) {
         batting[ball.striker_id].sixes++;
       }
-
 
       if (ball.legal_ball) {
         batting[ball.striker_id].balls++;
       }
     }
 
-
-    /* =========================
+    /* ================================
        WICKET
-    ========================= */
+    ================================ */
 
     if (ball.wicket) {
 
       wickets++;
 
-
-      if (
-        ball.dismissed_player_id &&
-        !batting[ball.dismissed_player_id]
-      ) {
-
-        batting[ball.dismissed_player_id] = {
-
-          id:
-            ball.dismissed_player_id,
-
-          name:
-            playerMap[
-              ball.dismissed_player_id
-            ] || 'Unknown Player',
-
-          runs: 0,
-          balls: 0,
-          fours: 0,
-          sixes: 0,
-
-          dismissal:
-            ball.dismissal_type ||
-            'out'
-        };
-      }
-
-
       if (ball.dismissed_player_id) {
 
-        batting[
-          ball.dismissed_player_id
-        ].dismissal =
-          ball.dismissal_type ||
-          'out';
+        if (!batting[ball.dismissed_player_id]) {
+
+          batting[ball.dismissed_player_id] = {
+            id: ball.dismissed_player_id,
+            name:
+              playerMap[ball.dismissed_player_id] ||
+              'Unknown Player',
+            runs: 0,
+            balls: 0,
+            fours: 0,
+            sixes: 0,
+            dismissal:
+              ball.dismissal_type || 'out'
+          };
+
+        } else {
+
+          batting[
+            ball.dismissed_player_id
+          ].dismissal =
+            ball.dismissal_type || 'out';
+
+        }
+
       }
+
     }
 
-
-    /* =========================
+    /* ================================
        BOWLING
-    ========================= */
+    ================================ */
 
     if (ball.bowler_id) {
 
       if (!bowling[ball.bowler_id]) {
 
         bowling[ball.bowler_id] = {
-
           id: ball.bowler_id,
-
           name:
             playerMap[ball.bowler_id] ||
             'Unknown Player',
-
           balls: 0,
           runs: 0,
           wickets: 0
         };
-      }
 
+      }
 
       if (ball.legal_ball) {
         bowling[ball.bowler_id].balls++;
       }
-
 
       const runsConceded =
         Number(ball.batsman_runs || 0) +
         Number(ball.extras_wides || 0) +
         Number(ball.extras_noballs || 0);
 
-
       bowling[ball.bowler_id].runs +=
         runsConceded;
-
 
       const nonBowlerWickets = [
         'run out',
@@ -196,77 +186,40 @@ function calculateScorecard(deliveries, players) {
         'obstructing the field'
       ];
 
+      const dismissal =
+        String(
+          ball.dismissal_type || ''
+        ).toLowerCase();
 
       if (
         ball.wicket &&
-        !nonBowlerWickets.includes(
-          String(
-            ball.dismissal_type || ''
-          ).toLowerCase()
-        )
+        !nonBowlerWickets.includes(dismissal)
       ) {
 
-        bowling[
-          ball.bowler_id
-        ].wickets++;
+        bowling[ball.bowler_id].wickets++;
+
       }
+
     }
 
   });
 
-
   return {
-
     totalRuns,
     wickets,
-
     legalBalls,
-
     wides,
     noBalls,
     byes,
     legByes,
-
-    batting:
-      Object.values(batting),
-
-    bowling:
-      Object.values(bowling)
+    batting: Object.values(batting),
+    bowling: Object.values(bowling)
   };
 }
 
-
-/* =========================================================
-   FORMAT OVERS
-========================================================= */
-
-function formatOvers(balls) {
-
-  return (
-    `${Math.floor(balls / 6)}.${balls % 6}`
-  );
-}
-
-
-/* =========================================================
-   FIND PLAYER
-========================================================= */
-
-function findPlayer(players, id) {
-
-  if (!id) {
-    return null;
-  }
-
-  return players.find(
-    player => player.id === id
-  ) || null;
-}
-
-
-/* =========================================================
+/* ================================
    UPDATE CURRENT PLAYERS
-========================================================= */
+================================ */
 
 function updateCurrentPlayers(
   innings,
@@ -292,57 +245,41 @@ function updateCurrentPlayers(
   const bowlerStatsElement =
     $('bowlerStats');
 
-
-  /*
-    Current player elements may not
-    exist in an older match.html.
-  */
-
-  if (
-    !strikerElement ||
-    !nonStrikerElement ||
-    !bowlerElement
-  ) {
+  if (!strikerElement ||
+      !nonStrikerElement ||
+      !bowlerElement) {
     return;
   }
 
+  /* ================================
+     CURRENT PLAYER IDs
+     COME FROM INNINGS TABLE
+  ================================ */
 
-  /*
-    IMPORTANT:
-
-    Read current state from innings table.
-
-    We DO NOT use the latest delivery
-    to decide who is currently striker.
-  */
-
-  const currentStriker =
+  const striker =
     findPlayer(
       players,
       innings.striker_id
     );
 
-  const currentNonStriker =
+  const nonStriker =
     findPlayer(
       players,
       innings.non_striker_id
     );
 
-  const currentBowler =
+  const bowler =
     findPlayer(
       players,
       innings.bowler_id
     );
 
-
-  /* =========================
+  /* ================================
      STRIKER
-  ========================= */
+  ================================ */
 
   strikerElement.textContent =
-    currentStriker?.name ||
-    'Not selected';
-
+    striker?.name || 'Not selected';
 
   const strikerData =
     stats.batting.find(
@@ -350,42 +287,35 @@ function updateCurrentPlayers(
         player.id === innings.striker_id
     );
 
+  if (strikerData) {
 
-  if (strikerStatsElement) {
+    const sr =
+      strikerData.balls > 0
+        ? (
+            strikerData.runs /
+            strikerData.balls *
+            100
+          ).toFixed(2)
+        : '0.00';
 
-    if (strikerData) {
+    strikerStatsElement.textContent =
+      `${strikerData.runs} runs · ` +
+      `${strikerData.balls} balls · ` +
+      `SR ${sr}`;
 
-      const sr =
-        strikerData.balls
-          ? (
-              strikerData.runs /
-              strikerData.balls *
-              100
-            ).toFixed(2)
-          : '0.00';
+  } else {
 
+    strikerStatsElement.textContent =
+      '0 runs · 0 balls · SR 0.00';
 
-      strikerStatsElement.textContent =
-        `${strikerData.runs} runs · ` +
-        `${strikerData.balls} balls · ` +
-        `SR ${sr}`;
-
-    } else {
-
-      strikerStatsElement.textContent =
-        '0 runs · 0 balls · SR 0.00';
-    }
   }
 
-
-  /* =========================
-     NON-STRIKER
-  ========================= */
+  /* ================================
+     NON STRIKER
+  ================================ */
 
   nonStrikerElement.textContent =
-    currentNonStriker?.name ||
-    'Not selected';
-
+    nonStriker?.name || 'Not selected';
 
   const nonStrikerData =
     stats.batting.find(
@@ -394,42 +324,35 @@ function updateCurrentPlayers(
         innings.non_striker_id
     );
 
+  if (nonStrikerData) {
 
-  if (nonStrikerStatsElement) {
+    const sr =
+      nonStrikerData.balls > 0
+        ? (
+            nonStrikerData.runs /
+            nonStrikerData.balls *
+            100
+          ).toFixed(2)
+        : '0.00';
 
-    if (nonStrikerData) {
+    nonStrikerStatsElement.textContent =
+      `${nonStrikerData.runs} runs · ` +
+      `${nonStrikerData.balls} balls · ` +
+      `SR ${sr}`;
 
-      const sr =
-        nonStrikerData.balls
-          ? (
-              nonStrikerData.runs /
-              nonStrikerData.balls *
-              100
-            ).toFixed(2)
-          : '0.00';
+  } else {
 
+    nonStrikerStatsElement.textContent =
+      '0 runs · 0 balls · SR 0.00';
 
-      nonStrikerStatsElement.textContent =
-        `${nonStrikerData.runs} runs · ` +
-        `${nonStrikerData.balls} balls · ` +
-        `SR ${sr}`;
-
-    } else {
-
-      nonStrikerStatsElement.textContent =
-        '0 runs · 0 balls · SR 0.00';
-    }
   }
 
-
-  /* =========================
+  /* ================================
      BOWLER
-  ========================= */
+  ================================ */
 
   bowlerElement.textContent =
-    currentBowler?.name ||
-    'Not selected';
-
+    bowler?.name || 'Not selected';
 
   const bowlerData =
     stats.bowling.find(
@@ -437,38 +360,34 @@ function updateCurrentPlayers(
         player.id === innings.bowler_id
     );
 
+  if (bowlerData) {
 
-  if (bowlerStatsElement) {
+    const economy =
+      bowlerData.balls > 0
+        ? (
+            bowlerData.runs /
+            (bowlerData.balls / 6)
+          ).toFixed(2)
+        : '0.00';
 
-    if (bowlerData) {
+    bowlerStatsElement.textContent =
+      `${formatOvers(bowlerData.balls)} overs · ` +
+      `${bowlerData.runs} runs · ` +
+      `${bowlerData.wickets} wickets · ` +
+      `Econ ${economy}`;
 
-      const economy =
-        bowlerData.balls
-          ? (
-              bowlerData.runs /
-              (bowlerData.balls / 6)
-            ).toFixed(2)
-          : '0.00';
+  } else {
 
+    bowlerStatsElement.textContent =
+      '0.0 overs · 0 runs · 0 wickets';
 
-      bowlerStatsElement.textContent =
-        `${formatOvers(bowlerData.balls)} overs · ` +
-        `${bowlerData.runs} runs · ` +
-        `${bowlerData.wickets} wickets · ` +
-        `Econ ${economy}`;
-
-    } else {
-
-      bowlerStatsElement.textContent =
-        '0.0 overs · 0 runs · 0 wickets';
-    }
   }
+
 }
 
-
-/* =========================================================
-   CREATE SCORECARD
-========================================================= */
+/* ================================
+   RENDER SCORECARD
+================================ */
 
 function renderScorecard(
   innings,
@@ -481,7 +400,7 @@ function renderScorecard(
     data.batting.map(player => {
 
       const strikeRate =
-        player.balls
+        player.balls > 0
           ? (
               player.runs /
               player.balls *
@@ -489,132 +408,90 @@ function renderScorecard(
             ).toFixed(2)
           : '0.00';
 
-
       return `
         <tr>
-
           <td>
-            <strong>
-              ${esc(player.name)}
-            </strong>
-
+            <strong>${esc(player.name)}</strong>
             <br>
-
             <small class="muted">
               ${esc(player.dismissal)}
             </small>
           </td>
-
           <td>${player.runs}</td>
-
           <td>${player.balls}</td>
-
           <td>${player.fours}</td>
-
           <td>${player.sixes}</td>
-
           <td>${strikeRate}</td>
-
         </tr>
       `;
 
     }).join('');
 
-
   const bowlingRows =
     data.bowling.map(player => {
 
-      const overs =
-        formatOvers(player.balls);
-
-
       const economy =
-        player.balls
+        player.balls > 0
           ? (
               player.runs /
               (player.balls / 6)
             ).toFixed(2)
           : '0.00';
 
-
       return `
         <tr>
-
           <td>
-            <strong>
-              ${esc(player.name)}
-            </strong>
+            <strong>${esc(player.name)}</strong>
           </td>
-
-          <td>${overs}</td>
-
+          <td>${formatOvers(player.balls)}</td>
           <td>${player.runs}</td>
-
           <td>${player.wickets}</td>
-
           <td>${economy}</td>
-
         </tr>
       `;
 
     }).join('');
 
-
-  const extrasTotal =
+  const extras =
     data.wides +
     data.noBalls +
     data.byes +
     data.legByes;
 
-
   const runRate =
-    data.legalBalls
+    data.legalBalls > 0
       ? (
           data.totalRuns /
           (data.legalBalls / 6)
         ).toFixed(2)
       : '0.00';
 
-
   return `
-
     <section class="scorecard">
 
       <div class="innings-header">
 
         <h2>
           Innings ${innings.innings_no}
-          —
-          ${esc(battingTeam)}
+          — ${esc(battingTeam)}
         </h2>
 
-
         <div class="innings-score">
-
           ${data.totalRuns}/${data.wickets}
-
           <span>
-            (${formatOvers(
-              data.legalBalls
-            )} overs)
+            (${formatOvers(data.legalBalls)} overs)
           </span>
-
         </div>
 
       </div>
 
-
-      <h3>
-        🏏 Batting
-      </h3>
-
+      <h3>🏏 Batting</h3>
 
       <div class="table-wrap">
 
         <table>
 
           <thead>
-
             <tr>
               <th>Batsman</th>
               <th>R</th>
@@ -623,15 +500,12 @@ function renderScorecard(
               <th>6s</th>
               <th>SR</th>
             </tr>
-
           </thead>
-
 
           <tbody>
 
             ${
               battingRows ||
-
               `
                 <tr>
                   <td colspan="6">
@@ -647,52 +521,35 @@ function renderScorecard(
 
       </div>
 
-
       <div class="innings-info">
 
         <div>
-
-          <strong>
-            Extras:
-          </strong>
-
-          ${extrasTotal}
-
+          <strong>Extras:</strong>
+          ${extras}
           (
           Wd ${data.wides},
           Nb ${data.noBalls},
           B ${data.byes},
           Lb ${data.legByes}
           )
-
         </div>
 
-
         <div>
-
-          <strong>
-            Run Rate:
-          </strong>
-
+          <strong>Run Rate:</strong>
           ${runRate}
-
         </div>
 
       </div>
 
-
       <h3>
-        🎳 Bowling —
-        ${esc(bowlingTeam)}
+        🎳 Bowling — ${esc(bowlingTeam)}
       </h3>
-
 
       <div class="table-wrap">
 
         <table>
 
           <thead>
-
             <tr>
               <th>Bowler</th>
               <th>O</th>
@@ -700,15 +557,12 @@ function renderScorecard(
               <th>W</th>
               <th>Econ</th>
             </tr>
-
           </thead>
-
 
           <tbody>
 
             ${
               bowlingRows ||
-
               `
                 <tr>
                   <td colspan="5">
@@ -728,27 +582,23 @@ function renderScorecard(
   `;
 }
 
-
-/* =========================================================
+/* ================================
    LOAD MATCH
-========================================================= */
+================================ */
 
 async function load() {
 
   if (!matchId) {
 
-    if ($('title')) {
-      $('title').textContent =
-        'Match not found';
-    }
+    $('title').textContent =
+      'Match not found';
 
     return;
   }
 
-
-  /* =======================================================
-     LOAD MATCH
-  ======================================================= */
+  /* ================================
+     MATCH
+  ================================ */
 
   const {
     data: match,
@@ -773,71 +623,42 @@ async function load() {
 
     .single();
 
-
   if (matchError || !match) {
 
-    console.error(
-      'Match loading error:',
-      matchError
-    );
+    console.error(matchError);
 
-    if ($('title')) {
-      $('title').textContent =
-        'Match not found';
-    }
-
-    if ($('meta')) {
-      $('meta').textContent =
-        matchError?.message ||
-        'Unable to load match.';
-    }
+    $('title').textContent =
+      'Match not found';
 
     return;
   }
 
-
-  /* =======================================================
+  /* ================================
      HEADER
-  ======================================================= */
+  ================================ */
 
-  if ($('title')) {
+  $('title').textContent =
+    `${match.team_a.name} vs ${match.team_b.name}`;
 
-    $('title').textContent =
-      `${match.team_a?.name || 'Team A'} vs ` +
-      `${match.team_b?.name || 'Team B'}`;
-  }
+  $('status').textContent =
+    String(
+      match.status || 'scheduled'
+    ).toUpperCase();
 
+  $('meta').textContent =
+    `${match.name} · ` +
+    `${match.venue || 'Venue not set'} · ` +
+    `${match.overs} overs`;
 
-  if ($('status')) {
+  $('result').textContent =
+    match.result_text || '';
 
-    $('status').textContent =
-      (match.status || 'scheduled')
-        .toUpperCase();
-  }
-
-
-  if ($('meta')) {
-
-    $('meta').textContent =
-      `${match.name || 'Match'} · ` +
-      `${match.venue || 'Venue not set'} · ` +
-      `${match.overs || 0} overs`;
-  }
-
-
-  if ($('result')) {
-
-    $('result').textContent =
-      match.result_text || '';
-  }
-
-
-  /* =======================================================
-     LOAD ALL PLAYERS
-  ======================================================= */
+  /* ================================
+     PLAYERS
+  ================================ */
 
   const {
-    data: allPlayers,
+    data: playersData,
     error: playersError
   } = await supabase
 
@@ -845,27 +666,19 @@ async function load() {
 
     .select(`
       id,
-      name,
-      role
+      name
     `);
 
-
   if (playersError) {
-
-    console.error(
-      'Players loading error:',
-      playersError
-    );
+    console.error(playersError);
   }
 
-
   const players =
-    allPlayers || [];
+    playersData || [];
 
-
-  /* =======================================================
-     LOAD INNINGS
-  ======================================================= */
+  /* ================================
+     INNINGS
+  ================================ */
 
   const {
     data: inningsList,
@@ -892,90 +705,43 @@ async function load() {
       ascending: true
     });
 
-
   if (inningsError) {
 
-    console.error(
-      'Innings loading error:',
-      inningsError
-    );
-
-    if ($('meta')) {
-      $('meta').textContent =
-        inningsError.message;
-    }
+    console.error(inningsError);
 
     return;
   }
 
-
-  /* =======================================================
+  /* ================================
      NO INNINGS
-  ======================================================= */
+  ================================ */
 
-  if (
-    !inningsList ||
-    !inningsList.length
-  ) {
+  if (!inningsList?.length) {
 
-    if ($('score')) {
-      $('score').textContent = '—';
-    }
+    $('score').textContent = '—';
+    $('rr').textContent = '—';
+    $('target').textContent = '—';
 
-    if ($('rr')) {
-      $('rr').textContent = '—';
-    }
+    $('striker').textContent = 'Not started';
+    $('nonStriker').textContent = 'Not started';
+    $('bowler').textContent = 'Not started';
 
-    if ($('target')) {
-      $('target').textContent = '—';
-    }
+    $('strikerStats').textContent = '';
+    $('nonStrikerStats').textContent = '';
+    $('bowlerStats').textContent = '';
 
-    if ($('striker')) {
-      $('striker').textContent =
-        'Not started';
-    }
-
-    if ($('nonStriker')) {
-      $('nonStriker').textContent =
-        'Not started';
-    }
-
-    if ($('bowler')) {
-      $('bowler').textContent =
-        'Not started';
-    }
-
-    if ($('strikerStats')) {
-      $('strikerStats').textContent = '';
-    }
-
-    if ($('nonStrikerStats')) {
-      $('nonStrikerStats').textContent = '';
-    }
-
-    if ($('bowlerStats')) {
-      $('bowlerStats').textContent = '';
-    }
-
-    if ($('commentary')) {
-
-      $('commentary').innerHTML =
-        '<p class="muted">' +
-        'Match has not started.' +
-        '</p>';
-    }
+    $('commentary').innerHTML =
+      '<p class="muted">Match has not started.</p>';
 
     return;
   }
 
-
-  /* =======================================================
-     SCORECARDS CONTAINER
-  ======================================================= */
+  /* ================================
+     SCORECARD CONTAINER
+  ================================ */
 
   let scorecardsContainer =
     $('scorecards');
-
 
   if (!scorecardsContainer) {
 
@@ -985,12 +751,10 @@ async function load() {
     scorecardsContainer.id =
       'scorecards';
 
-
     const commentary =
       $('commentary');
 
-
-    if (commentary?.parentElement) {
+    if (commentary) {
 
       commentary.parentElement
         .insertAdjacentElement(
@@ -1000,35 +764,24 @@ async function load() {
 
     } else {
 
-      document
-        .querySelector('main')
-        ?.appendChild(
-          scorecardsContainer
-        );
+      document.body.appendChild(
+        scorecardsContainer
+      );
+
     }
   }
 
-
-  /* =======================================================
-     PROCESS ALL INNINGS
-  ======================================================= */
-
   let scorecardsHTML = '';
-
   let allCommentary = [];
 
-  let latestStats = null;
+  /* ================================
+     PROCESS INNINGS
+  ================================ */
 
-  let latestInnings = null;
-
-
-  for (
-    const currentInnings
-    of inningsList
-  ) {
+  for (const innings of inningsList) {
 
     const {
-      data: deliveries,
+      data: deliveriesData,
       error: deliveriesError
     } = await supabase
 
@@ -1038,198 +791,115 @@ async function load() {
 
       .eq(
         'innings_id',
-        currentInnings.id
+        innings.id
       )
 
       .order('created_at', {
         ascending: true
       });
 
-
     if (deliveriesError) {
 
       console.error(
-        'Delivery loading error:',
         deliveriesError
       );
 
       continue;
     }
 
-
-    const deliveryList =
-      deliveries || [];
-
+    const deliveries =
+      deliveriesData || [];
 
     const stats =
       calculateScorecard(
-        deliveryList,
+        deliveries,
         players
       );
 
+    /* ================================
+       LATEST INNINGS
+    ================================ */
 
-    /* =====================================================
-       KEEP LAST INNINGS
-    ===================================================== */
+    const isLatest =
+      innings.innings_no ===
+      inningsList[
+        inningsList.length - 1
+      ].innings_no;
 
-    latestInnings =
-      currentInnings;
+    if (isLatest) {
 
-    latestStats =
-      stats;
+      $('score').textContent =
+        `${innings.batting?.name || 'Team'} ` +
+        `${stats.totalRuns}/${stats.wickets} ` +
+        `(${formatOvers(stats.legalBalls)})`;
 
+      $('rr').textContent =
+        stats.legalBalls > 0
+          ? (
+              stats.totalRuns /
+              (stats.legalBalls / 6)
+            ).toFixed(2)
+          : '0.00';
 
-    /* =====================================================
+      $('target').textContent =
+        innings.target || '—';
+
+      /* ================================
+         CURRENT PLAYERS
+      ================================ */
+
+      updateCurrentPlayers(
+        innings,
+        players,
+        stats
+      );
+    }
+
+    /* ================================
        SCORECARD
-    ===================================================== */
+    ================================ */
 
     scorecardsHTML +=
       renderScorecard(
-
-        currentInnings,
-
+        innings,
         stats,
-
-        currentInnings.batting?.name ||
+        innings.batting?.name ||
           'Batting Team',
-
-        currentInnings.bowling?.name ||
+        innings.bowling?.name ||
           'Bowling Team'
       );
 
-
-    /* =====================================================
+    /* ================================
        COMMENTARY
-    ===================================================== */
+    ================================ */
 
     allCommentary.push(
-
-      ...deliveryList.map(ball => ({
-
+      ...deliveries.map(ball => ({
         inningsNo:
-          currentInnings.innings_no,
-
+          innings.innings_no,
         over:
           ball.over_number,
-
         ball:
           ball.ball_number,
-
         commentary:
           ball.commentary ||
           'Ball recorded',
-
         created_at:
           ball.created_at
       }))
     );
   }
 
-
-  /* =======================================================
-     DISPLAY LATEST SCORE
-  ======================================================= */
-
-  if (
-    latestInnings &&
-    latestStats
-  ) {
-
-    if ($('score')) {
-
-      $('score').textContent =
-        `${latestInnings.batting?.name || 'Team'} ` +
-        `${latestStats.totalRuns}/${latestStats.wickets} ` +
-        `(${formatOvers(
-          latestStats.legalBalls
-        )})`;
-    }
-
-
-    if ($('rr')) {
-
-      $('rr').textContent =
-        latestStats.legalBalls
-
-          ? (
-              latestStats.totalRuns /
-              (latestStats.legalBalls / 6)
-            ).toFixed(2)
-
-          : '0.00';
-    }
-
-
-    if ($('target')) {
-
-      $('target').textContent =
-        latestInnings.target ||
-        '—';
-    }
-
-
-    /* =====================================================
-       CURRENT PLAYERS
-
-       ONLY SHOW AS LIVE STATE WHEN MATCH
-       IS NOT COMPLETED.
-    ===================================================== */
-
-    if (
-      match.status === 'live' ||
-      match.status === 'paused'
-    ) {
-
-      updateCurrentPlayers(
-        latestInnings,
-        players,
-        latestStats
-      );
-
-    } else {
-
-      if ($('striker')) {
-        $('striker').textContent =
-          'Match completed';
-      }
-
-      if ($('nonStriker')) {
-        $('nonStriker').textContent =
-          'Match completed';
-      }
-
-        if ($('bowler')) {
-        $('bowler').textContent =
-          'Match completed';
-      }
-
-      if ($('strikerStats')) {
-        $('strikerStats').textContent = '';
-      }
-
-      if ($('nonStrikerStats')) {
-        $('nonStrikerStats').textContent = '';
-      }
-
-      if ($('bowlerStats')) {
-        $('bowlerStats').textContent = '';
-      }
-    }
-  }
-
-
-  /* =======================================================
+  /* ================================
      DISPLAY SCORECARDS
-  ======================================================= */
+  ================================ */
 
   scorecardsContainer.innerHTML =
-    scorecardsHTML ||
-    '<p class="muted">No scorecard available.</p>';
+    scorecardsHTML;
 
-
-  /* =======================================================
-     SORT COMMENTARY
-  ======================================================= */
+  /* ================================
+     COMMENTARY
+  ================================ */
 
   allCommentary.sort((a, b) => {
 
@@ -1244,63 +914,35 @@ async function load() {
       );
     }
 
-
     return (
       new Date(b.created_at) -
       new Date(a.created_at)
     );
   });
 
-
-  /* =======================================================
-     DISPLAY COMMENTARY
-  ======================================================= */
-
-  if ($('commentary')) {
-
-    $('commentary').innerHTML =
-
-      allCommentary
-
-        .map(ball => `
-
-          <div class="comment">
-
-            <b>
-              Innings
-              ${ball.inningsNo}
-              ·
-              ${ball.over}.${ball.ball}
-            </b>
-
-            —
-            ${esc(ball.commentary)}
-
-          </div>
-
-        `)
-
-        .join('')
-
-        ||
-
-        '<p class="muted">' +
-        'No deliveries yet.' +
-        '</p>';
-  }
+  $('commentary').innerHTML =
+    allCommentary.map(ball => `
+      <div class="comment">
+        <b>
+          Innings ${ball.inningsNo}
+          · ${ball.over}.${ball.ball}
+        </b>
+        —
+        ${esc(ball.commentary)}
+      </div>
+    `).join('') ||
+    '<p class="muted">No deliveries yet.</p>';
 }
 
-
-/* =========================================================
+/* ================================
    START
-========================================================= */
+================================ */
 
 load();
 
-
-/* =========================================================
+/* ================================
    AUTO REFRESH
-========================================================= */
+================================ */
 
 setInterval(
   load,
