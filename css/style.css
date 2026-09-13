@@ -1,3 +1,92 @@
+/* =========================
+   TEAMS PAGE
+========================= */
+
+.team-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      auto-fit,
+      minmax(300px, 1fr)
+    );
+  gap: 16px;
+}
+
+
+.team-card {
+  min-width: 0;
+}
+
+
+.team-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+
+.team-heading h2 {
+  margin: 0 0 4px;
+}
+
+
+.team-players {
+  display: grid;
+  gap: 8px;
+}
+
+
+.team-player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 10px;
+
+  border: 1px solid #293847;
+
+  border-radius: 8px;
+}
+
+
+.player-number {
+  width: 30px;
+  height: 30px;
+
+  display: grid;
+  place-items: center;
+
+  flex-shrink: 0;
+
+  background: #202d38;
+
+  border-radius: 50%;
+}
+
+
+.team-player strong {
+  display: block;
+}
+
+
+.team-player small {
+  display: block;
+
+  color: #91a0ad;
+
+  margin-top: 3px;
+}
+
+
+@media (max-width: 700px) {
+
+  .team-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
 /* =================================
    CURRENT LIVE PLAYERS
 ================================= */
