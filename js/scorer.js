@@ -17,6 +17,7 @@ let state = {
   bowler: null
 };
 
+/* ESCAPE HTML */
 const esc = s =>
   String(s ?? '').replace(/[&<>"']/g, c => ({
     '&': '&amp;',
@@ -26,238 +27,198 @@ const esc = s =>
     "'": '&#39;'
   }[c]));
 
+/* =========================================================
+   SHOW ERROR
+========================================================= */
 
-/* =========================
+function showPageError(message) {
+  if ($('title')) $('title').textContent = 'Scorer Error';
+  if ($('inningsTitle')) $('inningsTitle').textContent = message;
+  if ($('score')) $('score').textContent = '—';
+  if ($('rr')) $('rr').textContent = '—';
+  if ($('target')) $('target').textContent = '—';
+
+  console.error(message);
+}
+
+/* =========================================================
    AUTHENTICATION
-========================= */
+========================================================= */
 
 async function ensureAuth() {
-
   const {
     data: { session }
   } = await supabase.auth.getSession();
 
   if (!session) {
-
     location.href = 'admin.html';
-
     return false;
   }
 
   return true;
 }
 
-
-/* =========================
+/* =========================================================
    GET DELIVERIES
-========================= */
+========================================================= */
 
 async function deliveries() {
+  if (!innings) return [];
 
-  if (!innings) {
-    return [];
-  }
-
-  const {
-    data,
-    error
-  } = await supabase
+  const { data, error } = await supabase
     .from('deliveries')
     .select('*')
     .eq('innings_id', innings.id)
-    .order('created_at', {
-      ascending: true
-    });
+    .order('created_at', { ascending: true });
 
   if (error) {
-
-    console.error(
-      'Unable to load deliveries:',
-      error
-    );
-
+    console.error('Unable to load deliveries:', error);
     return [];
   }
 
   return data || [];
 }
 
-
-/* =========================
+/* =========================================================
    PREVIOUS OVER BOWLER
-========================= */
+========================================================= */
 
 async function getPreviousOverBowler() {
-
   const d = await deliveries();
 
-  if (!d.length) {
-    return null;
-  }
+  if (!d.length) return null;
 
   const legalBalls =
-    d.filter(
-      x => x.legal_ball
-    ).length;
+    d.filter(x => x.legal_ball).length;
 
-  if (legalBalls < 6) {
-    return null;
-  }
+  if (legalBalls < 6) return null;
 
   const currentOver =
-    Math.floor(
-      legalBalls / 6
-    );
+    Math.floor(legalBalls / 6);
 
   const previousOver =
     currentOver - 1;
 
   const previousBalls =
-    d.filter(
-      x =>
-        x.over_number === previousOver &&
-        x.legal_ball &&
-        x.bowler_id
+    d.filter(x =>
+      x.over_number === previousOver &&
+      x.legal_ball &&
+      x.bowler_id
     );
 
-  if (!previousBalls.length) {
-    return null;
-  }
+  if (!previousBalls.length) return null;
 
   return previousBalls[0].bowler_id;
 }
 
-
-/* =========================
+/* =========================================================
    CHECK BOWLER RULE
-========================= */
+========================================================= */
 
 async function checkBowlerRule(bowlerId) {
-
-  if (!bowlerId) {
-    return true;
-  }
+  if (!bowlerId) return true;
 
   const previousOverBowler =
     await getPreviousOverBowler();
 
-  if (!previousOverBowler) {
-    return true;
-  }
+  if (!previousOverBowler) return true;
 
   return previousOverBowler !== bowlerId;
 }
 
-
-/* =========================
+/* =========================================================
    CALCULATE SCORE
-========================= */
+========================================================= */
 
 function calc(d) {
-
   const runs =
     d.reduce(
       (sum, ball) =>
-        sum +
-        Number(ball.total_runs || 0),
+        sum + Number(ball.total_runs || 0),
       0
     );
 
   const wickets =
-    d.filter(
-      ball => ball.wicket
-    ).length;
+    d.filter(ball => ball.wicket).length;
 
   const legal =
-    d.filter(
-      ball => ball.legal_ball
-    ).length;
+    d.filter(ball => ball.legal_ball).length;
 
   return {
-
     runs,
-
     wickets,
-
     legal,
-
     overs:
       `${Math.floor(legal / 6)}.${legal % 6}`
   };
 }
 
-
-/* =========================
+/* =========================================================
    LOAD MATCH
-========================= */
+========================================================= */
 
 async function load() {
 
-  const {
-    data: m,
-    error
-  } = await supabase
-    .from('matches')
-    .select(`
-      *,
-      team_a:teams!matches_team_a_id_fkey(id,name),
-      team_b:teams!matches_team_b_id_fkey(id,name)
-    `)
-    .eq('id', matchId)
-    .single();
+  if (!matchId) {
+    showPageError('Match ID is missing.');
+    return;
+  }
 
-  if (error) {
+  const { data: m, error } =
+    await supabase
+      .from('matches')
+      .select(`
+        *,
+        team_a:teams!matches_team_a_id_fkey(id,name),
+        team_b:teams!matches_team_b_id_fkey(id,name)
+      `)
+      .eq('id', matchId)
+      .single();
 
-    alert(
+  if (error || !m) {
+    showPageError(
       'Unable to load match: ' +
-      error.message
+      (error?.message || 'Match not found')
     );
-
     return;
   }
 
   match = m;
 
-
-  const {
-    data: i,
-    error: inningsError
-  } = await supabase
-    .from('innings')
-    .select('*')
-    .eq('match_id', matchId)
-    .eq('status', 'live')
-    .order('innings_no', {
-      ascending: false
-    })
-    .limit(1)
-    .maybeSingle();
+  const { data: i, error: inningsError } =
+    await supabase
+      .from('innings')
+      .select('*')
+      .eq('match_id', matchId)
+      .eq('status', 'live')
+      .order('innings_no', {
+        ascending: false
+      })
+      .limit(1)
+      .maybeSingle();
 
   if (inningsError) {
-
-    alert(
+    showPageError(
       'Unable to load innings: ' +
       inningsError.message
     );
-
     return;
   }
 
   innings = i;
 
-
   if (!innings) {
-
-    alert(
+    showPageError(
       'There is no active innings.'
     );
 
-    location.href =
-      `manage.html?id=${matchId}`;
+    setTimeout(() => {
+      location.href =
+        `manage.html?id=${matchId}`;
+    }, 1500);
 
     return;
   }
-
 
   const {
     data: mp,
@@ -272,69 +233,50 @@ async function load() {
     .eq('is_playing_xi', true);
 
   if (mpError) {
-
-    alert(
+    showPageError(
       'Unable to load Playing XI: ' +
       mpError.message
     );
-
     return;
   }
 
+  batting = (mp || [])
+    .filter(
+      x =>
+        x.team_id ===
+        innings.batting_team_id
+    )
+    .map(x => x.players)
+    .filter(Boolean);
 
-  batting =
-    (mp || [])
-      .filter(
-        x =>
-          x.team_id ===
-          innings.batting_team_id
-      )
-      .map(
-        x => x.players
-      )
-      .filter(Boolean);
-
-
-  bowling =
-    (mp || [])
-      .filter(
-        x =>
-          x.team_id ===
-          innings.bowling_team_id
-      )
-      .map(
-        x => x.players
-      )
-      .filter(Boolean);
-
+  bowling = (mp || [])
+    .filter(
+      x =>
+        x.team_id ===
+        innings.bowling_team_id
+    )
+    .map(x => x.players)
+    .filter(Boolean);
 
   if ($('title')) {
-
     $('title').textContent =
       `${match.team_a.name} vs ${match.team_b.name}`;
   }
 
-
   if ($('inningsTitle')) {
-
     $('inningsTitle').textContent =
       `Innings ${innings.innings_no} · LIVE`;
   }
 
-
   if ($('target')) {
-
     $('target').textContent =
       innings.target || '—';
   }
 
-
   if ($('publicLink')) {
-
     $('publicLink').href =
       `match.html?id=${matchId}`;
   }
-
 
   await rebuildState();
 
@@ -343,10 +285,9 @@ async function load() {
   await refresh();
 }
 
-
-/* =========================
-   REBUILD CURRENT STATE
-========================= */
+/* =========================================================
+   REBUILD PLAYER STATE
+========================================================= */
 
 async function rebuildState() {
 
@@ -357,7 +298,6 @@ async function rebuildState() {
   ) {
 
     state = {
-
       striker:
         innings.striker_id || null,
 
@@ -371,10 +311,7 @@ async function rebuildState() {
     return;
   }
 
-
-  const d =
-    await deliveries();
-
+  const d = await deliveries();
 
   if (!d.length) {
 
@@ -387,13 +324,10 @@ async function rebuildState() {
     return;
   }
 
-
   const last =
     d[d.length - 1];
 
-
   state = {
-
     striker:
       last.striker_id || null,
 
@@ -404,26 +338,15 @@ async function rebuildState() {
       last.bowler_id || null
   };
 
-
   const runningRuns =
     Number(last.batsman_runs || 0) +
     Number(last.extras_byes || 0) +
     Number(last.extras_legbyes || 0);
 
-
-  if (
-    runningRuns % 2 !== 0
-  ) {
-
-    [
-      state.striker,
-      state.non
-    ] = [
-      state.non,
-      state.striker
-    ];
+  if (runningRuns % 2 !== 0) {
+    [state.striker, state.non] =
+      [state.non, state.striker];
   }
-
 
   if (last.wicket) {
 
@@ -431,7 +354,6 @@ async function rebuildState() {
       last.dismissed_player_id ===
       state.striker
     ) {
-
       state.striker = null;
     }
 
@@ -439,17 +361,12 @@ async function rebuildState() {
       last.dismissed_player_id ===
       state.non
     ) {
-
       state.non = null;
     }
   }
 
-
   const legalBalls =
-    d.filter(
-      x => x.legal_ball
-    ).length;
-
+    d.filter(x => x.legal_ball).length;
 
   if (
     legalBalls > 0 &&
@@ -457,51 +374,36 @@ async function rebuildState() {
     last.legal_ball
   ) {
 
-    [
-      state.striker,
-      state.non
-    ] = [
-      state.non,
-      state.striker
-    ];
+    [state.striker, state.non] =
+      [state.non, state.striker];
 
     state.bowler = null;
   }
 }
 
-
-/* =========================
+/* =========================================================
    PLAYER OPTIONS
-========================= */
+========================================================= */
 
 function opts(players) {
 
   return `
-    <option value="">
-      Select player
-    </option>
+    <option value="">Select player</option>
 
-    ${
-      players
-        .map(player => `
-          <option value="${player.id}">
-            ${esc(player.name)}
-            ${
-              player.role
-                ? ` (${esc(player.role)})`
-                : ''
-            }
-          </option>
-        `)
-        .join('')
-    }
+    ${players.map(player => `
+      <option value="${player.id}">
+        ${esc(player.name)}
+        ${player.role
+          ? ` (${esc(player.role)})`
+          : ''}
+      </option>
+    `).join('')}
   `;
 }
 
-
-/* =========================
+/* =========================================================
    FILL SELECTS
-========================= */
+========================================================= */
 
 function fillSelects() {
 
@@ -514,7 +416,6 @@ function fillSelects() {
       state.striker || '';
   }
 
-
   if ($('nonStriker')) {
 
     $('nonStriker').innerHTML =
@@ -523,7 +424,6 @@ function fillSelects() {
     $('nonStriker').value =
       state.non || '';
   }
-
 
   if ($('bowler')) {
 
@@ -535,10 +435,9 @@ function fillSelects() {
   }
 }
 
-
-/* =========================
+/* =========================================================
    SAVE CURRENT STATE
-========================= */
+========================================================= */
 
 async function saveCurrentState() {
 
@@ -551,31 +450,24 @@ async function saveCurrentState() {
     return false;
   }
 
-
   if (
     !state.striker ||
     !state.non ||
     !state.bowler
   ) {
 
-    alert(
-      'Please select striker, non-striker and bowler.'
-    );
-
     return false;
   }
-
 
   const bowlerAllowed =
     await checkBowlerRule(
       state.bowler
     );
 
-
   if (!bowlerAllowed) {
 
     alert(
-      '❌ INVALID BOWLER\n\n' +
+      'INVALID BOWLER\n\n' +
       'The same bowler cannot bowl consecutive overs.\n\n' +
       'Please select a different bowler.'
     );
@@ -583,34 +475,21 @@ async function saveCurrentState() {
     return false;
   }
 
-
   const {
     data,
     error
-  } =
-    await supabase
-      .from('innings')
-      .update({
-
-        striker_id:
-          state.striker,
-
-        non_striker_id:
-          state.non,
-
-        bowler_id:
-          state.bowler
-
-      })
-      .eq(
-        'id',
-        innings.id
-      )
-      .select(
-        'id,striker_id,non_striker_id,bowler_id'
-      )
-      .single();
-
+  } = await supabase
+    .from('innings')
+    .update({
+      striker_id: state.striker,
+      non_striker_id: state.non,
+      bowler_id: state.bowler
+    })
+    .eq('id', innings.id)
+    .select(
+      'id,striker_id,non_striker_id,bowler_id'
+    )
+    .single();
 
   if (error) {
 
@@ -627,7 +506,6 @@ async function saveCurrentState() {
     return false;
   }
 
-
   innings.striker_id =
     data.striker_id;
 
@@ -636,7 +514,6 @@ async function saveCurrentState() {
 
   innings.bowler_id =
     data.bowler_id;
-
 
   state.striker =
     data.striker_id;
@@ -647,23 +524,22 @@ async function saveCurrentState() {
   state.bowler =
     data.bowler_id;
 
-
   return true;
 }
 
-
-/* =========================
+/* =========================================================
    REFRESH SCOREBOARD
-========================= */
+========================================================= */
 
 async function refresh() {
+
+  if (!innings || !match) return;
 
   const d =
     await deliveries();
 
   const c =
     calc(d);
-
 
   const rr =
     c.legal
@@ -673,20 +549,14 @@ async function refresh() {
         ).toFixed(2)
       : '0.00';
 
-
   if ($('score')) {
-
     $('score').textContent =
       `${c.runs}/${c.wickets}`;
   }
 
-
   if ($('rr')) {
-
-    $('rr').textContent =
-      rr;
+    $('rr').textContent = rr;
   }
-
 
   if ($('overText')) {
 
@@ -706,245 +576,196 @@ async function refresh() {
       text;
   }
 
-
   if ($('commentary')) {
 
     $('commentary').innerHTML =
-      d
-        .slice()
+      d.slice()
         .reverse()
         .map(x => `
           <div class="comment">
-
             <b>
               ${x.over_number}.${x.ball_number}
             </b>
-
-            — ${esc(
+            —
+            ${esc(
               x.commentary ||
               'Ball recorded'
             )}
-
           </div>
         `)
         .join('') ||
-
       '<p class="muted">No deliveries yet.</p>';
   }
-
 
   if ($('battingStats')) {
     battingStats(d);
   }
-
 
   if ($('bowlingStats')) {
     bowlingStats(d);
   }
 }
 
-
-/* =========================
+/* =========================================================
    BATTING STATISTICS
-========================= */
+========================================================= */
 
 function battingStats(d) {
 
   $('battingStats').innerHTML =
+    batting.map(player => {
 
-    batting
-      .map(player => {
+      const playerBalls =
+        d.filter(
+          x =>
+            x.striker_id === player.id &&
+            x.legal_ball
+        ).length;
 
-        const playerBalls =
-          d.filter(
-            x =>
-              x.striker_id === player.id &&
-              x.legal_ball
-          ).length;
+      const playerRuns =
+        d.filter(
+          x =>
+            x.striker_id === player.id
+        ).reduce(
+          (sum, x) =>
+            sum +
+            Number(
+              x.batsman_runs || 0
+            ),
+          0
+        );
 
+      const fours =
+        d.filter(
+          x =>
+            x.striker_id === player.id &&
+            Number(
+              x.batsman_runs || 0
+            ) === 4
+        ).length;
 
-        const playerRuns =
-          d
-            .filter(
-              x =>
-                x.striker_id === player.id
-            )
-            .reduce(
-              (sum, x) =>
-                sum +
-                Number(
-                  x.batsman_runs || 0
-                ),
-              0
-            );
+      const sixes =
+        d.filter(
+          x =>
+            x.striker_id === player.id &&
+            Number(
+              x.batsman_runs || 0
+            ) === 6
+        ).length;
 
+      const sr =
+        playerBalls
+          ? (
+              playerRuns *
+              100 /
+              playerBalls
+            ).toFixed(1)
+          : '0.0';
 
-        const fours =
-          d.filter(
-            x =>
-              x.striker_id === player.id &&
-              Number(
-                x.batsman_runs || 0
-              ) === 4
-          ).length;
+      return `
+        <div class="item">
 
+          <strong>
+            ${esc(player.name)}
+            ${state.striker === player.id
+              ? ' *'
+              : ''}
+          </strong>
 
-        const sixes =
-          d.filter(
-            x =>
-              x.striker_id === player.id &&
-              Number(
-                x.batsman_runs || 0
-              ) === 6
-          ).length;
+          <span class="small">
+            ${playerRuns} runs ·
+            ${playerBalls} balls ·
+            ${fours} fours ·
+            ${sixes} sixes ·
+            SR ${sr}
+          </span>
 
+        </div>
+      `;
 
-        const sr =
-          playerBalls
-            ? (
-                (playerRuns * 100) /
-                playerBalls
-              ).toFixed(1)
-            : '0.0';
-
-
-        return `
-          <div class="item">
-
-            <strong>
-
-              ${esc(player.name)}
-
-              ${
-                state.striker === player.id
-                  ? ' *'
-                  : ''
-              }
-
-            </strong>
-
-            <span class="small">
-
-              ${playerRuns} runs
-
-              · ${playerBalls} balls
-
-              · ${fours} fours
-
-              · ${sixes} sixes
-
-              · SR ${sr}
-
-            </span>
-
-          </div>
-        `;
-
-      })
-      .join('');
+    }).join('');
 }
 
-
-/* =========================
+/* =========================================================
    BOWLING STATISTICS
-========================= */
+========================================================= */
 
 function bowlingStats(d) {
 
   $('bowlingStats').innerHTML =
+    bowling.map(player => {
 
-    bowling
-      .map(player => {
+      const mine =
+        d.filter(
+          x =>
+            x.bowler_id === player.id
+        );
 
-        const mine =
-          d.filter(
-            x =>
-              x.bowler_id === player.id
-          );
+      const legal =
+        mine.filter(
+          x => x.legal_ball
+        ).length;
 
+      const runs =
+        mine.reduce(
+          (sum, x) =>
+            sum +
+            Number(
+              x.total_runs || 0
+            ),
+          0
+        );
 
-        const legal =
-          mine.filter(
-            x =>
-              x.legal_ball
-          ).length;
+      const economy =
+        legal
+          ? (
+              runs /
+              (legal / 6)
+            ).toFixed(2)
+          : '0.00';
 
+      const wickets =
+        mine.filter(
+          x =>
+            x.wicket &&
+            [
+              'Bowled',
+              'Caught',
+              'LBW',
+              'Stumped',
+              'Hit Wicket'
+            ].includes(
+              x.dismissal_type
+            )
+        ).length;
 
-        const runs =
-          mine.reduce(
-            (sum, x) =>
-              sum +
-              Number(
-                x.total_runs || 0
-              ),
-            0
-          );
+      return `
+        <div class="item">
 
+          <strong>
+            ${esc(player.name)}
+            ${state.bowler === player.id
+              ? ' *'
+              : ''}
+          </strong>
 
-        const economy =
-          legal
-            ? (
-                runs /
-                (legal / 6)
-              ).toFixed(2)
-            : '0.00';
+          <span class="small">
+            ${Math.floor(legal / 6)}.${legal % 6}
+            overs ·
+            ${runs} runs ·
+            ${wickets} wickets ·
+            ECO ${economy}
+          </span>
 
+        </div>
+      `;
 
-        const wickets =
-          mine.filter(
-            x =>
-              x.wicket &&
-              [
-                'Bowled',
-                'Caught',
-                'LBW',
-                'Stumped',
-                'Hit Wicket'
-              ].includes(
-                x.dismissal_type
-              )
-          ).length;
-
-
-        return `
-          <div class="item">
-
-            <strong>
-
-              ${esc(player.name)}
-
-              ${
-                state.bowler === player.id
-                  ? ' *'
-                  : ''
-              }
-
-            </strong>
-
-            <span class="small">
-
-              ${Math.floor(legal / 6)}.${legal % 6}
-              overs
-
-              · ${runs} runs
-
-              · ${wickets} wickets
-
-              · ECO ${economy}
-
-            </span>
-
-          </div>
-        `;
-
-      })
-      .join('');
+    }).join('');
 }
 
-
-/* =========================
+/* =========================================================
    SAVE PLAYERS BUTTON
-========================= */
+========================================================= */
 
 if ($('savePlayers')) {
 
@@ -960,7 +781,6 @@ if ($('savePlayers')) {
 
       const bowler =
         $('bowler')?.value || '';
-
 
       if (
         !striker ||
@@ -978,58 +798,45 @@ if ($('savePlayers')) {
         return;
       }
 
-
-      if (
-        striker === non
-      ) {
+      if (striker === non) {
 
         alert(
-          'Striker and non-striker cannot be the same player.'
+          'Striker and non-striker ' +
+          'cannot be the same player.'
         );
 
         return;
       }
-
 
       const bowlerAllowed =
         await checkBowlerRule(
           bowler
         );
 
-
       if (!bowlerAllowed) {
 
         alert(
-          '❌ INVALID BOWLER\n\n' +
-          'The same bowler cannot bowl consecutive overs.\n\n' +
-          'Please select a different bowler.'
+          'INVALID BOWLER\n\n' +
+          'The same bowler cannot bowl consecutive overs.'
         );
 
         return;
       }
 
-
       state = {
-
         striker,
         non,
         bowler
       };
 
-
       const saved =
         await saveCurrentState();
 
-
-      if (!saved) {
-        return;
-      }
-
+      if (!saved) return;
 
       fillSelects();
 
       await refresh();
-
 
       alert(
         '✓ PLAYERS SAVED SUCCESSFULLY'
@@ -1038,10 +845,9 @@ if ($('savePlayers')) {
   );
 }
 
-
-/* =========================
+/* =========================================================
    RECORD BALL
-========================= */
+========================================================= */
 
 async function record(x) {
 
@@ -1054,7 +860,6 @@ async function record(x) {
     return;
   }
 
-
   if (
     !innings ||
     innings.status !== 'live'
@@ -1066,7 +871,6 @@ async function record(x) {
 
     return;
   }
-
 
   if (
     !state.striker ||
@@ -1081,17 +885,15 @@ async function record(x) {
     return;
   }
 
-
   const bowlerAllowed =
     await checkBowlerRule(
       state.bowler
     );
 
-
   if (!bowlerAllowed) {
 
     alert(
-      '❌ ILLEGAL BOWLER\n\n' +
+      'ILLEGAL BOWLER\n\n' +
       'The same bowler cannot bowl consecutive overs.\n\n' +
       'Select a different bowler.'
     );
@@ -1099,21 +901,17 @@ async function record(x) {
     return;
   }
 
-
   const existing =
     await deliveries();
 
   const current =
     calc(existing);
 
-
   const maximumBalls =
     Number(match.overs) * 6;
 
-
   if (
-    current.legal >=
-    maximumBalls
+    current.legal >= maximumBalls
   ) {
 
     alert(
@@ -1123,11 +921,9 @@ async function record(x) {
     return;
   }
 
-
   const legalBall =
     !x.wide &&
     !x.noBall;
-
 
   const totalRuns =
     Number(x.bat || 0) +
@@ -1136,27 +932,21 @@ async function record(x) {
     Number(x.bye || 0) +
     Number(x.legBye || 0);
 
-
   const overNumber =
     Math.floor(
       current.legal / 6
     );
 
-
   const ballNumber =
     (current.legal % 6) + 1;
 
-
   const row = {
 
-    innings_id:
-      innings.id,
+    innings_id: innings.id,
 
-    over_number:
-      overNumber,
+    over_number: overNumber,
 
-    ball_number:
-      ballNumber,
+    ball_number: ballNumber,
 
     striker_id:
       state.striker,
@@ -1204,7 +994,6 @@ async function record(x) {
       x.commentary || ''
   };
 
-
   const {
     error
   } =
@@ -1212,91 +1001,68 @@ async function record(x) {
       .from('deliveries')
       .insert(row);
 
-
   if (error) {
 
     alert(
-      'Unable to save ball: ' +
+      'Unable to save ball:\n\n' +
       error.message
     );
+
+    console.error(error);
 
     return;
   }
 
+  /* RUN STRIKE CHANGE */
 
   const runningRuns =
     Number(x.bat || 0) +
     Number(x.bye || 0) +
     Number(x.legBye || 0);
 
+  if (runningRuns % 2 !== 0) {
 
-  if (
-    runningRuns % 2 !== 0
-  ) {
-
-    [
-      state.striker,
-      state.non
-    ] = [
-      state.non,
-      state.striker
-    ];
+    [state.striker, state.non] =
+      [state.non, state.striker];
   }
 
-
-  /* =========================
-     WICKET STATE
-  ========================= */
+  /* WICKET */
 
   if (x.wicket) {
 
     if (
-      state.striker ===
-      x.dismissed
+      state.striker === x.dismissed
     ) {
-
       state.striker = null;
     }
 
-
     if (
-      state.non ===
-      x.dismissed
+      state.non === x.dismissed
     ) {
-
       state.non = null;
     }
   }
 
+  /* OVER COMPLETE */
 
   const newLegal =
     current.legal +
     (legalBall ? 1 : 0);
-
 
   const overCompleted =
     legalBall &&
     newLegal > 0 &&
     newLegal % 6 === 0;
 
-
   if (overCompleted) {
 
-    [
-      state.striker,
-      state.non
-    ] = [
-      state.non,
-      state.striker
-    ];
+    [state.striker, state.non] =
+      [state.non, state.striker];
 
     state.bowler = null;
   }
 
-
-  /* =========================
-     SAVE STATE
-  ========================= */
+  /* SAVE STATE */
 
   if (
     state.striker &&
@@ -1307,9 +1073,7 @@ async function record(x) {
     const stateSaved =
       await saveCurrentState();
 
-    if (!stateSaved) {
-      return;
-    }
+    if (!stateSaved) return;
 
   } else {
 
@@ -1319,7 +1083,6 @@ async function record(x) {
       await supabase
         .from('innings')
         .update({
-
           striker_id:
             state.striker || null,
 
@@ -1328,28 +1091,18 @@ async function record(x) {
 
           bowler_id:
             state.bowler || null
-
         })
-        .eq(
-          'id',
-          innings.id
-        );
-
+        .eq('id', innings.id);
 
     if (partialStateError) {
 
-      console.error(
-        partialStateError
-      );
-
       alert(
-        'Unable to save current player state: ' +
+        'Unable to save current player state:\n\n' +
         partialStateError.message
       );
 
       return;
     }
-
 
     innings.striker_id =
       state.striker || null;
@@ -1361,11 +1114,9 @@ async function record(x) {
       state.bowler || null;
   }
 
-
   fillSelects();
 
   await refresh();
-
 
   const updatedDeliveries =
     await deliveries();
@@ -1373,39 +1124,34 @@ async function record(x) {
   const score =
     calc(updatedDeliveries);
 
-
-  /* =========================
+  /* =====================================================
      SECOND INNINGS
-  ========================= */
+  ===================================================== */
 
-  if (
-    innings.innings_no === 2
-  ) {
+  if (innings.innings_no === 2) {
 
     const firstRuns =
       await firstScore();
 
+    /* TARGET REACHED */
 
-    if (
-      score.runs >
-      firstRuns
-    ) {
+    if (score.runs > firstRuns) {
 
       await finishSecond(true);
 
       return;
     }
 
+    /* 10 WICKETS */
 
-    if (
-      score.wickets >= 10
-    ) {
+    if (score.wickets >= 10) {
 
       await finishSecond(false);
 
       return;
     }
 
+    /* OVERS COMPLETE */
 
     if (
       score.legal >= maximumBalls
@@ -1416,27 +1162,29 @@ async function record(x) {
       return;
     }
 
+    /* NEW BATSMAN */
 
     if (
       x.wicket &&
-      (
-        !state.striker ||
-        !state.non
-      )
+      (!state.striker ||
+       !state.non)
     ) {
 
       alert(
-        'Wicket recorded.\n\nSelect the new batsman.'
+        'Wicket recorded.\n\n' +
+        'Select the new batsman.'
       );
 
       return;
     }
 
+    /* NEW BOWLER */
 
     if (overCompleted) {
 
       alert(
-        `Over ${Math.floor(newLegal / 6)} completed.\n\nSelect a different bowler.`
+        `Over ${Math.floor(newLegal / 6)} completed.\n\n` +
+        'Select a different bowler.'
       );
 
       return;
@@ -1445,20 +1193,16 @@ async function record(x) {
     return;
   }
 
-
-  /* =========================
+  /* =====================================================
      FIRST INNINGS
-  ========================= */
+  ===================================================== */
 
-  if (
-    score.wickets >= 10
-  ) {
+  if (score.wickets >= 10) {
 
     await oversCompleted(score);
 
     return;
   }
-
 
   if (
     score.legal >= maximumBalls
@@ -1469,68 +1213,56 @@ async function record(x) {
     return;
   }
 
-
   if (
     x.wicket &&
-    (
-      !state.striker ||
-      !state.non
-    )
+    (!state.striker ||
+     !state.non)
   ) {
 
     alert(
-      'Wicket recorded.\n\nSelect the new batsman.'
+      'Wicket recorded.\n\n' +
+      'Select the new batsman.'
     );
 
     return;
   }
-
 
   if (overCompleted) {
 
     alert(
-      `Over ${Math.floor(newLegal / 6)} completed.\n\nSelect a different bowler.`
+      `Over ${Math.floor(newLegal / 6)} completed.\n\n` +
+      'Select a different bowler.'
     );
   }
 }
 
-
-/* =========================
+/* =========================================================
    OVERS COMPLETED
-========================= */
+========================================================= */
 
 async function oversCompleted(score) {
 
-  if (
-    innings.innings_no === 1
-  ) {
+  if (innings.innings_no === 1) {
 
-    await completeFirstInnings(
-      score
-    );
+    await completeFirstInnings(score);
 
     return;
   }
 
-
-  if (
-    innings.innings_no === 2
-  ) {
+  if (innings.innings_no === 2) {
 
     await finishSecond(false);
   }
 }
 
-
-/* =========================
+/* =========================================================
    COMPLETE FIRST INNINGS
-========================= */
+========================================================= */
 
 async function completeFirstInnings(score) {
 
   const target =
     score.runs + 1;
-
 
   const {
     error: firstError
@@ -1538,26 +1270,16 @@ async function completeFirstInnings(score) {
     await supabase
       .from('innings')
       .update({
-
-        status:
-          'completed'
-
+        status: 'completed'
       })
-      .eq(
-        'id',
-        innings.id
-      );
-
+      .eq('id', innings.id);
 
   if (firstError) {
 
-    alert(
-      firstError.message
-    );
+    alert(firstError.message);
 
     return;
   }
-
 
   const {
     data: existingSecond,
@@ -1566,26 +1288,16 @@ async function completeFirstInnings(score) {
     await supabase
       .from('innings')
       .select('*')
-      .eq(
-        'match_id',
-        matchId
-      )
-      .eq(
-        'innings_no',
-        2
-      )
+      .eq('match_id', matchId)
+      .eq('innings_no', 2)
       .maybeSingle();
-
 
   if (checkError) {
 
-    alert(
-      checkError.message
-    );
+    alert(checkError.message);
 
     return;
   }
-
 
   if (!existingSecond) {
 
@@ -1608,8 +1320,7 @@ async function completeFirstInnings(score) {
           bowling_team_id:
             innings.batting_team_id,
 
-          target:
-            target,
+          target,
 
           status:
             'live',
@@ -1624,12 +1335,9 @@ async function completeFirstInnings(score) {
             null
         });
 
-
     if (secondError) {
 
-      alert(
-        secondError.message
-      );
+      alert(secondError.message);
 
       return;
     }
@@ -1643,27 +1351,21 @@ async function completeFirstInnings(score) {
         .from('innings')
         .update({
 
-          status:
-            'live',
+          status: 'live',
 
-          target:
-            target,
+          target,
 
-          striker_id:
-            null,
+          striker_id: null,
 
-          non_striker_id:
-            null,
+          non_striker_id: null,
 
-          bowler_id:
-            null
+          bowler_id: null
 
         })
         .eq(
           'id',
           existingSecond.id
         );
-
 
     if (activateError) {
 
@@ -1675,36 +1377,23 @@ async function completeFirstInnings(score) {
     }
   }
 
-
   const {
     error: matchError
   } =
     await supabase
       .from('matches')
       .update({
-
-        status:
-          'live',
-
-        current_innings:
-          2
-
+        status: 'live',
+        current_innings: 2
       })
-      .eq(
-        'id',
-        matchId
-      );
-
+      .eq('id', matchId);
 
   if (matchError) {
 
-    alert(
-      matchError.message
-    );
+    alert(matchError.message);
 
     return;
   }
-
 
   alert(
     `✓ ${match.overs} Overs Completed!\n\n` +
@@ -1714,15 +1403,13 @@ async function completeFirstInnings(score) {
     `Starting Innings 2...`
   );
 
-
   location.href =
     `scorer.html?id=${matchId}`;
 }
 
-
-/* =========================
+/* =========================================================
    FIRST INNINGS SCORE
-========================= */
+========================================================= */
 
 async function firstScore() {
 
@@ -1733,25 +1420,13 @@ async function firstScore() {
     await supabase
       .from('innings')
       .select('id')
-      .eq(
-        'match_id',
-        matchId
-      )
-      .eq(
-        'innings_no',
-        1
-      )
+      .eq('match_id', matchId)
+      .eq('innings_no', 1)
       .maybeSingle();
 
-
-  if (
-    error ||
-    !firstInnings
-  ) {
-
+  if (error || !firstInnings) {
     return 0;
   }
-
 
   const {
     data
@@ -1764,10 +1439,7 @@ async function firstScore() {
         firstInnings.id
       );
 
-
-  return (
-    data || []
-  ).reduce(
+  return (data || []).reduce(
     (sum, ball) =>
       sum +
       Number(
@@ -1777,19 +1449,15 @@ async function firstScore() {
   );
 }
 
-
-/* =========================
+/* =========================================================
    FINISH SECOND INNINGS
-========================= */
+========================================================= */
 
 async function finishSecond(
   targetReached = false
 ) {
 
-  if (!innings) {
-    return;
-  }
-
+  if (!innings) return;
 
   const currentDeliveries =
     await deliveries();
@@ -1800,41 +1468,30 @@ async function finishSecond(
   const firstRuns =
     await firstScore();
 
-
   const battingTeam =
     innings.batting_team_id;
 
   const bowlingTeam =
     innings.bowling_team_id;
 
-
   const battingName =
     battingTeam === match.team_a.id
       ? match.team_a.name
       : match.team_b.name;
-
 
   const bowlingName =
     bowlingTeam === match.team_a.id
       ? match.team_a.name
       : match.team_b.name;
 
+  let winnerTeamId = null;
 
-  let winnerTeamId =
-    null;
+  let resultText = '';
 
-  let resultText =
-    '';
-
-
-  if (
-    score.runs >
-    firstRuns
-  ) {
+  if (score.runs > firstRuns) {
 
     winnerTeamId =
       battingTeam;
-
 
     const wicketsRemaining =
       Math.max(
@@ -1842,19 +1499,16 @@ async function finishSecond(
         10 - score.wickets
       );
 
-
     resultText =
       `${battingName} won by ` +
       `${wicketsRemaining} wicket(s)`;
 
   } else if (
-    score.runs <
-    firstRuns
+    score.runs < firstRuns
   ) {
 
     winnerTeamId =
       bowlingTeam;
-
 
     resultText =
       `${bowlingName} won by ` +
@@ -1866,7 +1520,6 @@ async function finishSecond(
       'Match tied';
   }
 
-
   const {
     error: inningsError
   } =
@@ -1875,21 +1528,14 @@ async function finishSecond(
       .update({
         status: 'completed'
       })
-      .eq(
-        'id',
-        innings.id
-      );
-
+      .eq('id', innings.id);
 
   if (inningsError) {
 
-    alert(
-      inningsError.message
-    );
+    alert(inningsError.message);
 
     return;
   }
-
 
   const updateData = {
 
@@ -1905,32 +1551,23 @@ async function finishSecond(
       new Date().toISOString()
   };
 
-
   const {
     error: matchError
   } =
     await supabase
       .from('matches')
       .update(updateData)
-      .eq(
-        'id',
-        matchId
-      );
-
+      .eq('id', matchId);
 
   if (matchError) {
 
-    alert(
-      matchError.message
-    );
+    alert(matchError.message);
 
     return;
   }
 
-
   match.status =
     'completed';
-
 
   alert(
     targetReached
@@ -1938,15 +1575,442 @@ async function finishSecond(
       : `MATCH COMPLETED!\n\n${resultText}`
   );
 
+  location.href =
+    `match.html?id=${matchId}`;
+}
+
+/* =========================================================
+   UNDO LAST BALL
+========================================================= */
+
+async function undoLastBall() {
+
+  if (!innings) {
+
+    alert(
+      'There is no active innings.'
+    );
+
+    return;
+  }
+
+  if (match.status === 'paused') {
+
+    alert(
+      'Resume the match before using UNDO.'
+    );
+
+    return;
+  }
+
+  const d =
+    await deliveries();
+
+  if (!d.length) {
+
+    alert(
+      'There is no ball to undo.'
+    );
+
+    return;
+  }
+
+  const lastBall =
+    d[d.length - 1];
+
+  const confirmed =
+    confirm(
+      'UNDO LAST BALL?\n\n' +
+      `Ball: ${lastBall.over_number}.${lastBall.ball_number}\n` +
+      `Runs: ${lastBall.total_runs || 0}\n` +
+      `${lastBall.wicket ? 'WICKET\n' : ''}\n` +
+      'This ball will be permanently deleted.'
+    );
+
+  if (!confirmed) return;
+
+  const {
+    error
+  } =
+    await supabase
+      .from('deliveries')
+      .delete()
+      .eq('id', lastBall.id);
+
+  if (error) {
+
+    alert(
+      'Unable to undo ball:\n\n' +
+      error.message
+    );
+
+    return;
+  }
+
+  /* REBUILD STATE FROM REMAINING BALLS */
+
+  const remaining =
+    await deliveries();
+
+  if (!remaining.length) {
+
+    state = {
+      striker: null,
+      non: null,
+      bowler: null
+    };
+
+  } else {
+
+    let rebuilt = {
+      striker: null,
+      non: null,
+      bowler: null
+    };
+
+    for (
+      let i = 0;
+      i < remaining.length;
+      i++
+    ) {
+
+      const ball =
+        remaining[i];
+
+      rebuilt.striker =
+        ball.striker_id || null;
+
+      rebuilt.non =
+        ball.non_striker_id || null;
+
+      rebuilt.bowler =
+        ball.bowler_id || null;
+
+      const runningRuns =
+        Number(
+          ball.batsman_runs || 0
+        ) +
+        Number(
+          ball.extras_byes || 0
+        ) +
+        Number(
+          ball.extras_legbyes || 0
+        );
+
+      if (
+        runningRuns % 2 !== 0
+      ) {
+
+        [
+          rebuilt.striker,
+          rebuilt.non
+        ] =
+        [
+          rebuilt.non,
+          rebuilt.striker
+        ];
+      }
+
+      if (ball.wicket) {
+
+        if (
+          rebuilt.striker ===
+          ball.dismissed_player_id
+        ) {
+
+          rebuilt.striker = null;
+        }
+
+        if (
+          rebuilt.non ===
+          ball.dismissed_player_id
+        ) {
+
+          rebuilt.non = null;
+        }
+      }
+
+      const legalCount =
+        remaining
+          .slice(0, i + 1)
+          .filter(
+            x => x.legal_ball
+          ).length;
+
+      if (
+        ball.legal_ball &&
+        legalCount > 0 &&
+        legalCount % 6 === 0
+      ) {
+
+        [
+          rebuilt.striker,
+          rebuilt.non
+        ] =
+        [
+          rebuilt.non,
+          rebuilt.striker
+        ];
+
+        rebuilt.bowler = null;
+      }
+    }
+
+    state = rebuilt;
+  }
+
+  const {
+    error: stateError
+  } =
+    await supabase
+      .from('innings')
+      .update({
+
+        striker_id:
+          state.striker || null,
+
+        non_striker_id:
+          state.non || null,
+
+        bowler_id:
+          state.bowler || null
+      })
+      .eq('id', innings.id);
+
+  if (stateError) {
+
+    alert(
+      'Ball deleted, but player state could not be restored:\n\n' +
+      stateError.message
+    );
+
+    return;
+  }
+
+  innings.striker_id =
+    state.striker;
+
+  innings.non_striker_id =
+    state.non;
+
+  innings.bowler_id =
+    state.bowler;
+
+  fillSelects();
+
+  await refresh();
+
+  alert(
+    '✓ LAST BALL UNDONE SUCCESSFULLY'
+  );
+}
+
+/* =========================================================
+   UNDO BUTTON
+========================================================= */
+
+if ($('undo')) {
+
+  $('undo').onclick =
+    async () => {
+
+      await undoLastBall();
+
+    };
+}
+
+/* =========================================================
+   END INNINGS
+========================================================= */
+
+async function endCurrentInnings() {
+
+  if (!innings) {
+
+    alert(
+      'There is no active innings.'
+    );
+
+    return;
+  }
+
+  const d =
+    await deliveries();
+
+  const score =
+    calc(d);
+
+  const confirmed =
+    confirm(
+      `END INNINGS?\n\n` +
+      `Current Score: ${score.runs}/${score.wickets}\n` +
+      `Overs: ${score.overs}\n\n` +
+      `Do you want to end this innings?`
+    );
+
+  if (!confirmed) return;
+
+  if (
+    innings.innings_no === 1
+  ) {
+
+    await completeFirstInnings(
+      score
+    );
+
+    return;
+  }
+
+  if (
+    innings.innings_no === 2
+  ) {
+
+    await finishSecond(false);
+
+    return;
+  }
+}
+
+/* =========================================================
+   END INNINGS BUTTON
+========================================================= */
+
+if ($('endInnings')) {
+
+  $('endInnings').onclick =
+    async () => {
+
+      await endCurrentInnings();
+
+    };
+}
+
+/* =========================================================
+   END MATCH
+========================================================= */
+
+async function endMatchManually() {
+
+  if (!innings) {
+
+    alert(
+      'There is no active innings.'
+    );
+
+    return;
+  }
+
+  const d =
+    await deliveries();
+
+  const score =
+    calc(d);
+
+  const confirmed =
+    confirm(
+      `END MATCH NOW?\n\n` +
+      `Current Innings: ${innings.innings_no}\n` +
+      `Score: ${score.runs}/${score.wickets}\n` +
+      `Overs: ${score.overs}\n\n` +
+      `This will mark the match as COMPLETED.\n\n` +
+      `Continue?`
+    );
+
+  if (!confirmed) return;
+
+  /* =====================================================
+     IF SECOND INNINGS
+  ===================================================== */
+
+  if (
+    innings.innings_no === 2
+  ) {
+
+    await finishSecond(false);
+
+    return;
+  }
+
+  /* =====================================================
+     IF FIRST INNINGS
+  ===================================================== */
+
+  const {
+    error: inningsError
+  } =
+    await supabase
+      .from('innings')
+      .update({
+        status: 'completed'
+      })
+      .eq('id', innings.id);
+
+  if (inningsError) {
+
+    alert(
+      'Unable to end innings:\n\n' +
+      inningsError.message
+    );
+
+    return;
+  }
+
+  const {
+    error: matchError
+  } =
+    await supabase
+      .from('matches')
+      .update({
+
+        status: 'completed',
+
+        winner_team_id: null,
+
+        result_text:
+          'Match ended manually — No result',
+
+        completed_at:
+          new Date().toISOString()
+
+      })
+      .eq('id', matchId);
+
+  if (matchError) {
+
+    alert(
+      'Unable to end match:\n\n' +
+      matchError.message
+    );
+
+    return;
+  }
+
+  alert(
+    '✓ MATCH ENDED\n\n' +
+    'Result: No result'
+  );
 
   location.href =
     `match.html?id=${matchId}`;
 }
 
+/* =========================================================
+   END MATCH BUTTON
+========================================================= */
 
-/* =========================
+if ($('endMatch')) {
+
+  $('endMatch').onclick =
+    async () => {
+
+      await endMatchManually();
+
+    };
+}
+
+/* =========================================================
    RUN BUTTONS
-========================= */
+========================================================= */
 
 document
   .querySelectorAll('[data-run]')
@@ -1960,11 +2024,9 @@ document
             button.dataset.run
           );
 
-
         record({
 
-          bat:
-            runs,
+          bat: runs,
 
           commentary:
             runs === 0
@@ -1974,10 +2036,9 @@ document
       };
   });
 
-
-/* =========================
+/* =========================================================
    WIDE
-========================= */
+========================================================= */
 
 if ($('wide')) {
 
@@ -1992,7 +2053,6 @@ if ($('wide')) {
           )
         );
 
-
       if (
         !Number.isFinite(runs) ||
         runs < 1
@@ -2005,11 +2065,9 @@ if ($('wide')) {
         return;
       }
 
-
       record({
 
-        wide:
-          runs,
+        wide: runs,
 
         commentary:
           `${runs} wide run(s)`
@@ -2017,10 +2075,9 @@ if ($('wide')) {
     };
 }
 
-
-/* =========================
+/* =========================================================
    NO BALL
-========================= */
+========================================================= */
 
 if ($('noBall')) {
 
@@ -2035,7 +2092,6 @@ if ($('noBall')) {
           )
         );
 
-
       if (
         !Number.isFinite(batRuns) ||
         batRuns < 0
@@ -2048,14 +2104,11 @@ if ($('noBall')) {
         return;
       }
 
-
       record({
 
-        noBall:
-          1,
+        noBall: 1,
 
-        bat:
-          batRuns,
+        bat: batRuns,
 
         commentary:
           `No ball + ${batRuns} bat run(s)`
@@ -2063,10 +2116,9 @@ if ($('noBall')) {
     };
 }
 
-
-/* =========================
+/* =========================================================
    BYE
-========================= */
+========================================================= */
 
 if ($('bye')) {
 
@@ -2081,7 +2133,6 @@ if ($('bye')) {
           )
         );
 
-
       if (
         !Number.isFinite(runs) ||
         runs < 1
@@ -2094,11 +2145,9 @@ if ($('bye')) {
         return;
       }
 
-
       record({
 
-        bye:
-          runs,
+        bye: runs,
 
         commentary:
           `${runs} bye run(s)`
@@ -2106,10 +2155,9 @@ if ($('bye')) {
     };
 }
 
-
-/* =========================
+/* =========================================================
    LEG BYE
-========================= */
+========================================================= */
 
 if ($('legBye')) {
 
@@ -2124,7 +2172,6 @@ if ($('legBye')) {
           )
         );
 
-
       if (
         !Number.isFinite(runs) ||
         runs < 1
@@ -2137,11 +2184,9 @@ if ($('legBye')) {
         return;
       }
 
-
       record({
 
-        legBye:
-          runs,
+        legBye: runs,
 
         commentary:
           `${runs} leg-bye run(s)`
@@ -2149,10 +2194,9 @@ if ($('legBye')) {
     };
 }
 
-
-/* =====================================================
+/* =========================================================
    WICKET MODAL
-===================================================== */
+========================================================= */
 
 function openWicketModal() {
 
@@ -2168,18 +2212,17 @@ function openWicketModal() {
     return;
   }
 
-
   const striker =
     batting.find(
-      p => p.id === state.striker
+      p =>
+        p.id === state.striker
     );
-
 
   const nonStriker =
     batting.find(
-      p => p.id === state.non
+      p =>
+        p.id === state.non
     );
-
 
   const modal =
     $('modal');
@@ -2187,17 +2230,15 @@ function openWicketModal() {
   const body =
     $('modalBody');
 
-
-  if (!modal || !body) {
-    return;
-  }
-
+  if (!modal || !body) return;
 
   body.innerHTML = `
 
     <div class="wicket-section">
 
-      <h3>Who was dismissed?</h3>
+      <h3>
+        Who was dismissed?
+      </h3>
 
       <label class="wicket-option">
 
@@ -2210,7 +2251,10 @@ function openWicketModal() {
         <span>
 
           <strong>
-            ${esc(striker?.name || 'Striker')}
+            ${esc(
+              striker?.name ||
+              'Striker'
+            )}
           </strong>
 
           <small>
@@ -2220,7 +2264,6 @@ function openWicketModal() {
         </span>
 
       </label>
-
 
       <label class="wicket-option">
 
@@ -2233,7 +2276,10 @@ function openWicketModal() {
         <span>
 
           <strong>
-            ${esc(nonStriker?.name || 'Non-striker')}
+            ${esc(
+              nonStriker?.name ||
+              'Non-striker'
+            )}
           </strong>
 
           <small>
@@ -2246,10 +2292,11 @@ function openWicketModal() {
 
     </div>
 
-
     <div class="wicket-section">
 
-      <h3>Dismissal type</h3>
+      <h3>
+        Dismissal type
+      </h3>
 
       <select id="dismissalType">
 
@@ -2292,28 +2339,16 @@ function openWicketModal() {
       </select>
 
     </div>
-
   `;
 
-
-  const firstRadio =
-    body.querySelector(
-      'input[name="dismissedPlayer"]'
-    );
-
-
-  if (firstRadio) {
-    firstRadio.checked = true;
-  }
-
-
-  modal.classList.remove('hidden');
+  modal.classList.remove(
+    'hidden'
+  );
 }
 
-
-/* =========================
+/* =========================================================
    CLOSE WICKET MODAL
-========================= */
+========================================================= */
 
 function closeWicketModal() {
 
@@ -2328,10 +2363,9 @@ function closeWicketModal() {
   }
 }
 
-
-/* =========================
+/* =========================================================
    WICKET BUTTON
-========================= */
+========================================================= */
 
 if ($('wicket')) {
 
@@ -2343,10 +2377,9 @@ if ($('wicket')) {
     };
 }
 
-
-/* =========================
+/* =========================================================
    WICKET CONFIRM
-========================= */
+========================================================= */
 
 if ($('modalConfirm')) {
 
@@ -2357,7 +2390,6 @@ if ($('modalConfirm')) {
         document.querySelector(
           'input[name="dismissedPlayer"]:checked'
         );
-
 
       if (
         !selected ||
@@ -2371,26 +2403,20 @@ if ($('modalConfirm')) {
         return;
       }
 
-
       const dismissal =
         $('dismissalType')?.value ||
         'Bowled';
 
-
       const dismissedId =
         selected.value;
-
 
       const dismissedPlayer =
         batting.find(
           p =>
-            p.id ===
-            dismissedId
+            p.id === dismissedId
         );
 
-
       closeWicketModal();
-
 
       await record({
 
@@ -2399,20 +2425,19 @@ if ($('modalConfirm')) {
         dismissed:
           dismissedId,
 
-        dismissal:
-          dismissal,
+        dismissal,
 
         commentary:
-          `Wicket — ${dismissedPlayer?.name || 'Batsman'} (${dismissal})`
+          `Wicket — ` +
+          `${dismissedPlayer?.name || 'Batsman'} ` +
+          `(${dismissal})`
       });
-
     };
 }
 
-
-/* =========================
+/* =========================================================
    WICKET CANCEL
-========================= */
+========================================================= */
 
 if ($('modalCancel')) {
 
@@ -2424,10 +2449,9 @@ if ($('modalCancel')) {
     };
 }
 
-
-/* =========================
-   CLOSE MODAL OUTSIDE
-========================= */
+/* =========================================================
+   CLICK OUTSIDE MODAL
+========================================================= */
 
 if ($('modal')) {
 
@@ -2442,20 +2466,25 @@ if ($('modal')) {
 
         closeWicketModal();
       }
-
     }
   );
 }
 
-
-/* =========================
-   PAUSE
-========================= */
+/* =========================================================
+   PAUSE MATCH
+========================================================= */
 
 if ($('pauseMatch')) {
 
   $('pauseMatch').onclick =
     async () => {
+
+      const confirmed =
+        confirm(
+          'Pause this match?'
+        );
+
+      if (!confirmed) return;
 
       const {
         error
@@ -2465,38 +2494,32 @@ if ($('pauseMatch')) {
           .update({
             status: 'paused'
           })
-          .eq(
-            'id',
-            matchId
-          );
-
+          .eq('id', matchId);
 
       if (error) {
 
         alert(
+          'Unable to pause match:\n\n' +
           error.message
         );
 
         return;
       }
 
-
       match.status =
         'paused';
 
-
       alert(
-        'Match paused.'
+        '✓ Match paused.'
       );
 
       await refresh();
     };
 }
 
-
-/* =========================
-   RESUME
-========================= */
+/* =========================================================
+   RESUME MATCH
+========================================================= */
 
 if ($('resumeMatch')) {
 
@@ -2511,59 +2534,39 @@ if ($('resumeMatch')) {
           .update({
             status: 'live'
           })
-          .eq(
-            'id',
-            matchId
-          );
-
+          .eq('id', matchId);
 
       if (error) {
 
         alert(
+          'Unable to resume match:\n\n' +
           error.message
         );
 
         return;
       }
 
-
       match.status =
         'live';
 
-
       alert(
-        'Match resumed.'
+        '✓ Match resumed.'
       );
 
       await refresh();
     };
 }
 
-
-/* =========================
+/* =========================================================
    INITIALIZE
-========================= */
+========================================================= */
 
 (async function init() {
 
   const authenticated =
     await ensureAuth();
 
-
-  if (!authenticated) {
-    return;
-  }
-
-
-  if (!matchId) {
-
-    alert(
-      'Match ID is missing.'
-    );
-
-    return;
-  }
-
+  if (!authenticated) return;
 
   await load();
 
