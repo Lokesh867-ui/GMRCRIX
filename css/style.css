@@ -776,3 +776,301 @@ p {
   }
 
 }
+/* =========================================
+   GMRCRIX 3D GLASS THEME
+========================================= */
+
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-shadow: rgba(0, 0, 0, 0.45);
+  --neon-blue: #20d9ff;
+  --neon-purple: #8b5cff;
+  --neon-pink: #ff2fa4;
+}
+
+/* Dark neon background */
+body {
+  background:
+    radial-gradient(circle at 15% 15%, rgba(0, 200, 255, 0.16), transparent 30%),
+    radial-gradient(circle at 85% 20%, rgba(170, 50, 255, 0.18), transparent 30%),
+    radial-gradient(circle at 50% 90%, rgba(255, 30, 150, 0.10), transparent 35%),
+    #070812;
+}
+
+/* Glass cards */
+.card,
+.scorebox,
+.stat,
+.item,
+.scorecard,
+.current-player,
+.team-player,
+.notice {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  box-shadow:
+    0 15px 40px var(--glass-shadow),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+/* 3D hover effect */
+@media (hover: hover) {
+  .card:hover,
+  .scorebox:hover,
+  .stat:hover,
+  .item:hover,
+  .team-player:hover {
+    transform: translateY(-4px) perspective(800px) rotateX(1deg);
+    border-color: rgba(32, 217, 255, 0.35);
+
+    box-shadow:
+      0 22px 50px rgba(0,0,0,0.55),
+      0 0 25px rgba(32,217,255,0.08),
+      inset 0 1px 0 rgba(255,255,255,0.12);
+  }
+}
+
+/* Header glass */
+header {
+  background: rgba(8, 10, 20, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+
+  border-bottom: 1px solid var(--glass-border);
+
+  box-shadow: 0 10px 35px rgba(0,0,0,0.35);
+}
+
+/* GMRCRIX logo */
+.logo {
+  background: linear-gradient(
+    90deg,
+    var(--neon-blue),
+    var(--neon-purple),
+    var(--neon-pink)
+  );
+
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+
+  text-shadow: 0 0 25px rgba(32,217,255,0.18);
+}
+
+/* Buttons */
+button {
+  background: linear-gradient(
+    135deg,
+    #159fd0,
+    #6750df
+  );
+
+  border: 1px solid rgba(255,255,255,0.15);
+
+  box-shadow:
+    0 8px 20px rgba(0,0,0,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.15);
+
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.12);
+
+  box-shadow:
+    0 12px 28px rgba(0,0,0,0.45),
+    0 0 18px rgba(32,217,255,0.18);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Score */
+.score {
+  background: linear-gradient(
+    90deg,
+    #ffffff,
+    var(--neon-blue),
+    #b98cff
+  );
+
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+
+  text-shadow: 0 0 30px rgba(32,217,255,0.16);
+}
+
+/* Live indicator */
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  color: #ff5361;
+
+  animation: livePulse 1.5s infinite;
+}
+
+.live::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+
+  border-radius: 50%;
+  background: #ff4055;
+
+  box-shadow: 0 0 12px #ff4055;
+}
+
+@keyframes livePulse {
+  0%, 100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Form controls */
+input,
+select,
+textarea {
+  background: rgba(0,0,0,0.25);
+
+  border: 1px solid rgba(255,255,255,0.12);
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+
+  border-color: var(--neon-blue);
+
+  box-shadow:
+    0 0 0 3px rgba(32,217,255,0.08),
+    0 0 18px rgba(32,217,255,0.10);
+}
+
+/* Score statistics */
+.stat b {
+  background: linear-gradient(
+    90deg,
+    var(--neon-blue),
+    #a978ff
+  );
+
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Scoring buttons */
+.buttons button {
+  background: rgba(255,255,255,0.07);
+
+  border: 1px solid rgba(255,255,255,0.12);
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.buttons button:hover:not(:disabled) {
+  background: rgba(32,217,255,0.12);
+
+  border-color: rgba(32,217,255,0.4);
+
+  box-shadow:
+    0 0 20px rgba(32,217,255,0.12);
+}
+
+/* 4 / 6 buttons */
+.buttons .accent {
+  background: linear-gradient(
+    135deg,
+    #ff2f9c,
+    #7c3cff
+  );
+
+  box-shadow:
+    0 0 20px rgba(255,47,156,0.18);
+}
+
+/* Commentary */
+.comment {
+  background: rgba(255,255,255,0.045);
+
+  border-left: 3px solid var(--neon-blue);
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Modal glass */
+.modal {
+  background: rgba(0,0,0,0.68);
+
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.modal .card {
+  background: rgba(20,20,35,0.82);
+
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+
+  box-shadow:
+    0 30px 80px rgba(0,0,0,0.65),
+    0 0 35px rgba(32,217,255,0.08);
+}
+
+/* Smooth page appearance */
+.container {
+  animation: pageEnter 0.5s ease both;
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respect reduced-motion settings */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
